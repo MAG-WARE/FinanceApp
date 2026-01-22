@@ -11,7 +11,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "https": {
+    "FinanceApp": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
