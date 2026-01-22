@@ -60,4 +60,9 @@ $RECYCLE.BIN/
 
 # Application specific
 appsettings.Production.json
+appsettings.Development.json
+appsettings.json
 *.log
+
+# User Secrets (automatically ignored but explicit for clarity)
+secrets.json
