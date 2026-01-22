@@ -67,9 +67,7 @@ public class AccountService : IAccountService
         var account = accounts.FirstOrDefault();
 
         if (account == null)
-        {
             throw new KeyNotFoundException("Conta não encontrada");
-        }
 
         _logger.LogInformation("Updating account {AccountId} for user {UserId}", accountId, userId);
 
@@ -91,9 +89,7 @@ public class AccountService : IAccountService
         var account = accounts.FirstOrDefault();
 
         if (account == null)
-        {
             throw new KeyNotFoundException("Conta não encontrada");
-        }
 
         _logger.LogInformation("Deleting account {AccountId} for user {UserId}", accountId, userId);
 
@@ -121,22 +117,14 @@ public class AccountService : IAccountService
         {
             if (transaction.AccountId == accountId)
             {
-                // Transação de origem desta conta
                 if (transaction.Type == TransactionType.Income)
-                {
                     balance += transaction.Amount;
-                }
                 else if (transaction.Type == TransactionType.Expense || transaction.Type == TransactionType.Transfer)
-                {
                     balance -= transaction.Amount;
-                }
             }
 
             if (transaction.DestinationAccountId == accountId && transaction.Type == TransactionType.Transfer)
-            {
-                // Transferência recebida nesta conta
                 balance += transaction.Amount;
-            }
         }
 
         return balance;

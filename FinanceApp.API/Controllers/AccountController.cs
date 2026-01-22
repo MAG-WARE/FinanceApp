@@ -59,9 +59,7 @@ public class AccountController : ControllerBase
         var account = await _accountService.GetAccountByIdAsync(id, userId);
 
         if (account == null)
-        {
             return NotFound(new { message = "Conta não encontrada" });
-        }
 
         return Ok(account);
     }

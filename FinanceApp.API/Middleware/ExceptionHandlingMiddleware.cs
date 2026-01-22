@@ -59,7 +59,6 @@ public class ExceptionHandlingMiddleware
                 break;
 
             default:
-                // Log detalhado apenas para erros internos
                 _logger.LogError(exception, "Unhandled exception");
                 break;
         }

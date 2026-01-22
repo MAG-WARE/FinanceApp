@@ -3,11 +3,12 @@ using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Domain.Entities;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using BCrypt.Net;
+using JwtRegisteredClaimNames = Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
 namespace FinanceApp.Application.Services;
 
@@ -32,24 +33,20 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
     {
-        // Verificar se o email já existe
         var existingUser = await _userRepository.FindAsync(u => u.Email == registerDto.Email);
         if (existingUser.Any())
         {
             throw new InvalidOperationException("Email já está em uso");
         }
 
-        // Criar o usuário
         var user = _mapper.Map<User>(registerDto);
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
         user.Id = Guid.NewGuid();
 
         var createdUser = await _userRepository.AddAsync(user);
 
-        // Criar categorias padrão
         await _categoryService.CreateDefaultCategoriesAsync(createdUser.Id);
 
-        // Gerar token JWT
         var token = GenerateJwtToken(createdUser);
 
         return new AuthResponseDto
@@ -61,7 +58,6 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
     {
-        // Buscar usuário por email
         var users = await _userRepository.FindAsync(u => u.Email == loginDto.Email);
         var user = users.FirstOrDefault();
 
@@ -70,13 +66,11 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Email ou senha inválidos");
         }
 
-        // Verificar senha
         if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
         {
             throw new UnauthorizedAccessException("Email ou senha inválidos");
         }
 
-        // Gerar token JWT
         var token = GenerateJwtToken(user);
 
         return new AuthResponseDto
