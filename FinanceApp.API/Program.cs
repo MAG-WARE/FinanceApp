@@ -97,8 +97,13 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Configure AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
+// Configure AutoMapper manually
+var mapperConfig = new AutoMapper.MapperConfiguration(cfg =>
+{
+    cfg.AddProfile<MappingProfile>();
+});
+var mapper = mapperConfig.CreateMapper();
+builder.Services.AddSingleton<AutoMapper.IMapper>(mapper);
 
 // Register Repositories
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
