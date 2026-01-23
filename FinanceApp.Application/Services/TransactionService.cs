@@ -140,6 +140,9 @@ public class TransactionService : ITransactionService
             var transaction = _mapper.Map<Transaction>(dto);
             transaction.Id = Guid.NewGuid();
 
+            if (transaction.Date.Kind != DateTimeKind.Utc)
+                transaction.Date = DateTime.SpecifyKind(transaction.Date, DateTimeKind.Utc);
+
             _logger.LogInformation("Salvando transação no banco de dados - TransactionId: {TransactionId}", transaction.Id);
 
             try

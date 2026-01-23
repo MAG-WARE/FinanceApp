@@ -36,7 +36,6 @@ public class ExceptionHandlingMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        // Log detalhado da exceção
         LogExceptionDetails(exception);
 
         var statusCode = HttpStatusCode.InternalServerError;
@@ -78,9 +77,15 @@ public class ExceptionHandlingMiddleware
                 errors = dbErrors;
                 break;
 
-            case NpgsqlException postgresException:
+            case PostgresException postgresException:
                 statusCode = HttpStatusCode.BadRequest;
                 message = HandlePostgresException(postgresException);
+                break;
+
+            case NpgsqlException npgsqlException:
+                statusCode = HttpStatusCode.BadRequest;
+                message = "Erro ao comunicar com o banco de dados";
+                _logger.LogError(npgsqlException, "NpgsqlException não mapeada: {Message}", npgsqlException.Message);
                 break;
 
             case ArgumentException argumentException:
@@ -95,11 +100,8 @@ public class ExceptionHandlingMiddleware
 
             default:
                 _logger.LogError(exception, "Unhandled exception: {ExceptionType}", exception.GetType().Name);
-                // Em desenvolvimento, mostra detalhes do erro
                 if (_environment.IsDevelopment())
-                {
                     details = exception.ToString();
-                }
                 break;
         }
 
@@ -141,7 +143,6 @@ public class ExceptionHandlingMiddleware
             exceptionDetails.InnerException ?? "Nenhuma",
             exceptionDetails.StackTrace);
 
-        // Log da inner exception completa se existir
         if (exception.InnerException != null)
         {
             _logger.LogError(exception.InnerException,
@@ -159,7 +160,6 @@ public class ExceptionHandlingMiddleware
             "Erro ao atualizar banco de dados. Entries afetados: {Count}",
             dbUpdateException.Entries.Count);
 
-        // Log detalhado de cada entry com problema
         foreach (var entry in dbUpdateException.Entries)
         {
             _logger.LogError(
@@ -173,17 +173,11 @@ public class ExceptionHandlingMiddleware
             );
         }
 
-        // Verifica se é uma exceção do Postgres
         if (dbUpdateException.InnerException is PostgresException postgresException)
-        {
             return HandlePostgresException(postgresException, errors);
-        }
 
-        // Se não conseguiu identificar, retorna mensagem genérica com detalhes em dev
         if (_environment.IsDevelopment())
-        {
             errors.Add($"Detalhes técnicos: {dbUpdateException.InnerException?.Message ?? dbUpdateException.Message}");
-        }
 
         return "Erro ao salvar dados no banco de dados. Verifique os dados e tente novamente.";
     }
@@ -203,7 +197,6 @@ public class ExceptionHandlingMiddleware
             postgresException.TableName ?? "N/A",
             postgresException.ColumnName ?? "N/A");
 
-        // Códigos de erro do PostgreSQL: https://www.postgresql.org/docs/current/errcodes-appendix.html
         switch (postgresException.SqlState)
         {
             case "23505": // unique_violation
@@ -259,7 +252,6 @@ public class ExceptionHandlingMiddleware
         if (string.IsNullOrEmpty(technicalName))
             return "campo";
 
-        // Converte nomes técnicos para nomes amigáveis
         var fieldMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "email", "e-mail" },
