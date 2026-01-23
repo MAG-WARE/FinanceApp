@@ -38,49 +38,135 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryDto> CreateCategoryAsync(CreateCategoryDto dto, Guid userId)
     {
-        _logger.LogInformation("Creating category {CategoryName} for user {UserId}", dto.Name, userId);
+        try
+        {
+            _logger.LogInformation(
+                "Iniciando criação de categoria - UserId: {UserId}, Name: {Name}, Type: {Type}",
+                userId, dto.Name, dto.Type);
 
-        var category = _mapper.Map<Category>(dto);
-        category.UserId = userId;
-        category.Id = Guid.NewGuid();
+            var category = _mapper.Map<Category>(dto);
+            category.UserId = userId;
+            category.Id = Guid.NewGuid();
 
-        var createdCategory = await _categoryRepository.AddAsync(category);
-        return _mapper.Map<CategoryDto>(createdCategory);
+            _logger.LogInformation("Salvando categoria no banco de dados - CategoryId: {CategoryId}", category.Id);
+
+            try
+            {
+                var createdCategory = await _categoryRepository.AddAsync(category);
+
+                _logger.LogInformation("Categoria criada com sucesso - CategoryId: {CategoryId}, UserId: {UserId}",
+                    createdCategory.Id, userId);
+
+                return _mapper.Map<CategoryDto>(createdCategory);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao salvar categoria no banco - CategoryId: {CategoryId}, UserId: {UserId}, Name: {Name}. Erro: {ErrorMessage}",
+                    category.Id, userId, dto.Name, ex.Message);
+                throw;
+            }
+        }
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao criar categoria - UserId: {UserId}, Name: {Name}",
+                userId, dto.Name);
+            throw new InvalidOperationException($"Erro ao criar categoria: {ex.Message}", ex);
+        }
     }
 
     public async Task<CategoryDto> UpdateCategoryAsync(Guid categoryId, UpdateCategoryDto dto, Guid userId)
     {
-        var categories = await _categoryRepository.FindAsync(c => c.Id == categoryId && c.UserId == userId);
-        var category = categories.FirstOrDefault();
-
-        if (category == null)
+        try
         {
-            throw new KeyNotFoundException("Categoria não encontrada");
+            _logger.LogInformation(
+                "Iniciando atualização de categoria - CategoryId: {CategoryId}, UserId: {UserId}, NewName: {Name}",
+                categoryId, userId, dto.Name);
+
+            var categories = await _categoryRepository.FindAsync(c => c.Id == categoryId && c.UserId == userId);
+            var category = categories.FirstOrDefault();
+
+            if (category == null)
+            {
+                _logger.LogWarning("Categoria não encontrada ou não pertence ao usuário - CategoryId: {CategoryId}, UserId: {UserId}",
+                    categoryId, userId);
+                throw new KeyNotFoundException($"Categoria com ID {categoryId} não encontrada");
+            }
+
+            _logger.LogInformation("Validações concluídas. Atualizando categoria no banco...");
+
+            category.Name = dto.Name;
+            category.Color = dto.Color;
+            category.Icon = dto.Icon;
+
+            try
+            {
+                await _categoryRepository.UpdateAsync(category);
+
+                _logger.LogInformation("Categoria atualizada com sucesso - CategoryId: {CategoryId}, UserId: {UserId}",
+                    categoryId, userId);
+
+                return _mapper.Map<CategoryDto>(category);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao atualizar categoria no banco - CategoryId: {CategoryId}, UserId: {UserId}. Erro: {ErrorMessage}",
+                    categoryId, userId, ex.Message);
+                throw;
+            }
         }
-
-        _logger.LogInformation("Updating category {CategoryId} for user {UserId}", categoryId, userId);
-
-        category.Name = dto.Name;
-        category.Color = dto.Color;
-        category.Icon = dto.Icon;
-
-        await _categoryRepository.UpdateAsync(category);
-        return _mapper.Map<CategoryDto>(category);
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao atualizar categoria - CategoryId: {CategoryId}, UserId: {UserId}",
+                categoryId, userId);
+            throw new InvalidOperationException($"Erro ao atualizar categoria: {ex.Message}", ex);
+        }
     }
 
     public async Task DeleteCategoryAsync(Guid categoryId, Guid userId)
     {
-        var categories = await _categoryRepository.FindAsync(c => c.Id == categoryId && c.UserId == userId);
-        var category = categories.FirstOrDefault();
-
-        if (category == null)
+        try
         {
-            throw new KeyNotFoundException("Categoria não encontrada");
+            _logger.LogInformation("Iniciando exclusão de categoria - CategoryId: {CategoryId}, UserId: {UserId}",
+                categoryId, userId);
+
+            var categories = await _categoryRepository.FindAsync(c => c.Id == categoryId && c.UserId == userId);
+            var category = categories.FirstOrDefault();
+
+            if (category == null)
+            {
+                _logger.LogWarning("Categoria não encontrada ou não pertence ao usuário - CategoryId: {CategoryId}, UserId: {UserId}",
+                    categoryId, userId);
+                throw new KeyNotFoundException($"Categoria com ID {categoryId} não encontrada");
+            }
+
+            _logger.LogInformation("Validações concluídas. Excluindo categoria do banco...");
+
+            try
+            {
+                await _categoryRepository.DeleteAsync(categoryId);
+
+                _logger.LogInformation("Categoria excluída com sucesso - CategoryId: {CategoryId}, UserId: {UserId}",
+                    categoryId, userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao excluir categoria no banco - CategoryId: {CategoryId}, UserId: {UserId}. Erro: {ErrorMessage}",
+                    categoryId, userId, ex.Message);
+                throw;
+            }
         }
-
-        _logger.LogInformation("Deleting category {CategoryId} for user {UserId}", categoryId, userId);
-
-        await _categoryRepository.DeleteAsync(categoryId);
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao excluir categoria - CategoryId: {CategoryId}, UserId: {UserId}",
+                categoryId, userId);
+            throw new InvalidOperationException($"Erro ao excluir categoria: {ex.Message}", ex);
+        }
     }
 
     public async Task<IEnumerable<CategoryDto>> GetCategoriesByTypeAsync(Guid userId, CategoryType type)

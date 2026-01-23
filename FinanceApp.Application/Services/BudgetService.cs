@@ -52,71 +52,167 @@ public class BudgetService : IBudgetService
 
     public async Task<BudgetDto> CreateBudgetAsync(CreateBudgetDto dto, Guid userId)
     {
-        // Validar que a categoria pertence ao usuário
-        var category = await _categoryRepository.GetByIdAsync(dto.CategoryId);
-        if (category == null || category.UserId != userId)
+        try
         {
-            throw new UnauthorizedAccessException("Categoria não pertence ao usuário");
+            _logger.LogInformation(
+                "Iniciando criação de orçamento - UserId: {UserId}, CategoryId: {CategoryId}, Month: {Month}/{Year}, Limit: {Limit}",
+                userId, dto.CategoryId, dto.Month, dto.Year, dto.LimitAmount);
+
+            // Validar que a categoria pertence ao usuário
+            var category = await _categoryRepository.GetByIdAsync(dto.CategoryId);
+            if (category == null)
+            {
+                _logger.LogWarning("Categoria não encontrada: {CategoryId}", dto.CategoryId);
+                throw new KeyNotFoundException($"Categoria com ID {dto.CategoryId} não encontrada");
+            }
+            if (category.UserId != userId)
+            {
+                _logger.LogWarning(
+                    "Tentativa de criar orçamento com categoria não autorizada - UserId: {UserId}, CategoryId: {CategoryId}, CategoryOwner: {OwnerId}",
+                    userId, dto.CategoryId, category.UserId);
+                throw new UnauthorizedAccessException("Categoria não pertence ao usuário");
+            }
+
+            // Verificar se já existe um orçamento para essa categoria e período
+            var existingBudgets = await _budgetRepository.FindAsync(b =>
+                b.UserId == userId &&
+                b.CategoryId == dto.CategoryId &&
+                b.Month == dto.Month &&
+                b.Year == dto.Year);
+
+            if (existingBudgets.Any())
+            {
+                _logger.LogWarning(
+                    "Tentativa de criar orçamento duplicado - UserId: {UserId}, CategoryId: {CategoryId}, Month: {Month}/{Year}",
+                    userId, dto.CategoryId, dto.Month, dto.Year);
+                throw new InvalidOperationException($"Já existe um orçamento para esta categoria no período {dto.Month:D2}/{dto.Year}");
+            }
+
+            _logger.LogInformation("Validações concluídas. Criando orçamento no banco...");
+
+            var budget = _mapper.Map<Budget>(dto);
+            budget.UserId = userId;
+            budget.Id = Guid.NewGuid();
+
+            try
+            {
+                var createdBudget = await _budgetRepository.AddAsync(budget);
+
+                _logger.LogInformation("Orçamento criado com sucesso - BudgetId: {BudgetId}, UserId: {UserId}",
+                    createdBudget.Id, userId);
+
+                var budgetDtos = await MapBudgetsWithSpending(new[] { createdBudget }, userId);
+                return budgetDtos.First();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao salvar orçamento no banco - UserId: {UserId}, CategoryId: {CategoryId}. Erro: {ErrorMessage}",
+                    userId, dto.CategoryId, ex.Message);
+                throw;
+            }
         }
-
-        // Verificar se já existe um orçamento para essa categoria e período
-        var existingBudgets = await _budgetRepository.FindAsync(b =>
-            b.UserId == userId &&
-            b.CategoryId == dto.CategoryId &&
-            b.Month == dto.Month &&
-            b.Year == dto.Year);
-
-        if (existingBudgets.Any())
+        catch (Exception ex) when (ex is not UnauthorizedAccessException &&
+                                    ex is not KeyNotFoundException &&
+                                    ex is not InvalidOperationException)
         {
-            throw new InvalidOperationException("Já existe um orçamento para esta categoria e período");
+            _logger.LogError(ex,
+                "Erro inesperado ao criar orçamento - UserId: {UserId}, CategoryId: {CategoryId}",
+                userId, dto.CategoryId);
+            throw new InvalidOperationException($"Erro ao criar orçamento: {ex.Message}", ex);
         }
-
-        _logger.LogInformation("Creating budget for category {CategoryId}, month {Month}/{Year}, user {UserId}",
-            dto.CategoryId, dto.Month, dto.Year, userId);
-
-        var budget = _mapper.Map<Budget>(dto);
-        budget.UserId = userId;
-        budget.Id = Guid.NewGuid();
-
-        var createdBudget = await _budgetRepository.AddAsync(budget);
-
-        var budgetDtos = await MapBudgetsWithSpending(new[] { createdBudget }, userId);
-        return budgetDtos.First();
     }
 
     public async Task<BudgetDto> UpdateBudgetAsync(Guid budgetId, UpdateBudgetDto dto, Guid userId)
     {
-        var budgets = await _budgetRepository.FindAsync(b => b.Id == budgetId && b.UserId == userId);
-        var budget = budgets.FirstOrDefault();
-
-        if (budget == null)
+        try
         {
-            throw new KeyNotFoundException("Orçamento não encontrado");
+            _logger.LogInformation(
+                "Iniciando atualização de orçamento - BudgetId: {BudgetId}, UserId: {UserId}, NewLimit: {Limit}",
+                budgetId, userId, dto.LimitAmount);
+
+            var budgets = await _budgetRepository.FindAsync(b => b.Id == budgetId && b.UserId == userId);
+            var budget = budgets.FirstOrDefault();
+
+            if (budget == null)
+            {
+                _logger.LogWarning("Orçamento não encontrado ou não pertence ao usuário - BudgetId: {BudgetId}, UserId: {UserId}",
+                    budgetId, userId);
+                throw new KeyNotFoundException($"Orçamento com ID {budgetId} não encontrado");
+            }
+
+            _logger.LogInformation("Validações concluídas. Atualizando orçamento no banco...");
+
+            budget.LimitAmount = dto.LimitAmount;
+
+            try
+            {
+                await _budgetRepository.UpdateAsync(budget);
+
+                _logger.LogInformation("Orçamento atualizado com sucesso - BudgetId: {BudgetId}, UserId: {UserId}",
+                    budgetId, userId);
+
+                var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, userId);
+                return budgetDtos.First();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao atualizar orçamento no banco - BudgetId: {BudgetId}, UserId: {UserId}. Erro: {ErrorMessage}",
+                    budgetId, userId, ex.Message);
+                throw;
+            }
         }
-
-        _logger.LogInformation("Updating budget {BudgetId} for user {UserId}", budgetId, userId);
-
-        budget.LimitAmount = dto.LimitAmount;
-
-        await _budgetRepository.UpdateAsync(budget);
-
-        var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, userId);
-        return budgetDtos.First();
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao atualizar orçamento - BudgetId: {BudgetId}, UserId: {UserId}",
+                budgetId, userId);
+            throw new InvalidOperationException($"Erro ao atualizar orçamento: {ex.Message}", ex);
+        }
     }
 
     public async Task DeleteBudgetAsync(Guid budgetId, Guid userId)
     {
-        var budgets = await _budgetRepository.FindAsync(b => b.Id == budgetId && b.UserId == userId);
-        var budget = budgets.FirstOrDefault();
-
-        if (budget == null)
+        try
         {
-            throw new KeyNotFoundException("Orçamento não encontrado");
+            _logger.LogInformation("Iniciando exclusão de orçamento - BudgetId: {BudgetId}, UserId: {UserId}",
+                budgetId, userId);
+
+            var budgets = await _budgetRepository.FindAsync(b => b.Id == budgetId && b.UserId == userId);
+            var budget = budgets.FirstOrDefault();
+
+            if (budget == null)
+            {
+                _logger.LogWarning("Orçamento não encontrado ou não pertence ao usuário - BudgetId: {BudgetId}, UserId: {UserId}",
+                    budgetId, userId);
+                throw new KeyNotFoundException($"Orçamento com ID {budgetId} não encontrado");
+            }
+
+            _logger.LogInformation("Validações concluídas. Excluindo orçamento do banco...");
+
+            try
+            {
+                await _budgetRepository.DeleteAsync(budgetId);
+
+                _logger.LogInformation("Orçamento excluído com sucesso - BudgetId: {BudgetId}, UserId: {UserId}",
+                    budgetId, userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao excluir orçamento no banco - BudgetId: {BudgetId}, UserId: {UserId}. Erro: {ErrorMessage}",
+                    budgetId, userId, ex.Message);
+                throw;
+            }
         }
-
-        _logger.LogInformation("Deleting budget {BudgetId} for user {UserId}", budgetId, userId);
-
-        await _budgetRepository.DeleteAsync(budgetId);
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao excluir orçamento - BudgetId: {BudgetId}, UserId: {UserId}",
+                budgetId, userId);
+            throw new InvalidOperationException($"Erro ao excluir orçamento: {ex.Message}", ex);
+        }
     }
 
     public async Task<IEnumerable<BudgetStatusDto>> GetBudgetStatusAsync(Guid userId, int month, int year)
