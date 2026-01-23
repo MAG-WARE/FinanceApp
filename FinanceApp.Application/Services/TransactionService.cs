@@ -181,7 +181,6 @@ public class TransactionService : ITransactionService
                 "Iniciando atualização de transação - TransactionId: {TransactionId}, UserId: {UserId}, NewAmount: {Amount}",
                 transactionId, userId, dto.Amount);
 
-            // Buscar transação usando FindAsync para evitar problemas de tracking
             var transactions = await _transactionRepository.FindAsync(t => t.Id == transactionId);
             var transaction = transactions.FirstOrDefault();
 
@@ -191,7 +190,6 @@ public class TransactionService : ITransactionService
                 throw new KeyNotFoundException($"Transação com ID {transactionId} não encontrada");
             }
 
-            // Verificar que a transação pertence ao usuário
             var accounts = await _accountRepository.FindAsync(a => a.Id == transaction.AccountId);
             var account = accounts.FirstOrDefault();
 
@@ -208,7 +206,6 @@ public class TransactionService : ITransactionService
                 throw new UnauthorizedAccessException("Transação não pertence ao usuário");
             }
 
-            // Validar que a categoria pertence ao usuário
             var categories = await _categoryRepository.FindAsync(c => c.Id == dto.CategoryId);
             var category = categories.FirstOrDefault();
 
@@ -278,7 +275,6 @@ public class TransactionService : ITransactionService
                 throw new KeyNotFoundException($"Transação com ID {transactionId} não encontrada");
             }
 
-            // Verificar que a transação pertence ao usuário
             var account = await _accountRepository.GetByIdAsync(transaction.AccountId);
             if (account == null)
             {

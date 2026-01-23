@@ -48,18 +48,14 @@ public class GoalService : IGoalService
         goal.Id = Guid.NewGuid();
         goal.IsCompleted = false;
 
-        // Corrigir DateTime para UTC (PostgreSQL)
         if (goal.StartDate.Kind != DateTimeKind.Utc)
             goal.StartDate = DateTime.SpecifyKind(goal.StartDate, DateTimeKind.Utc);
 
         if (goal.TargetDate.HasValue && goal.TargetDate.Value.Kind != DateTimeKind.Utc)
             goal.TargetDate = DateTime.SpecifyKind(goal.TargetDate.Value, DateTimeKind.Utc);
 
-        // Verificar se já atingiu a meta ao criar
         if (goal.CurrentAmount >= goal.TargetAmount)
-        {
             goal.IsCompleted = true;
-        }
 
         var createdGoal = await _goalRepository.AddAsync(goal);
 
@@ -72,9 +68,7 @@ public class GoalService : IGoalService
         var goal = goals.FirstOrDefault();
 
         if (goal == null)
-        {
             throw new KeyNotFoundException("Meta não encontrada");
-        }
 
         _logger.LogInformation("Updating goal {GoalId} for user {UserId}", goalId, userId);
 
@@ -86,20 +80,16 @@ public class GoalService : IGoalService
         goal.Color = dto.Color;
         goal.Icon = dto.Icon;
 
-        // Corrigir DateTime para UTC (PostgreSQL)
         if (goal.TargetDate.HasValue && goal.TargetDate.Value.Kind != DateTimeKind.Utc)
             goal.TargetDate = DateTime.SpecifyKind(goal.TargetDate.Value, DateTimeKind.Utc);
 
-        // Verificar se atingiu a meta
         if (goal.CurrentAmount >= goal.TargetAmount && !goal.IsCompleted)
         {
             goal.IsCompleted = true;
             _logger.LogInformation("Goal {GoalId} completed for user {UserId}", goalId, userId);
         }
         else if (goal.CurrentAmount < goal.TargetAmount && goal.IsCompleted)
-        {
             goal.IsCompleted = false;
-        }
 
         await _goalRepository.UpdateAsync(goal);
 
@@ -112,9 +102,7 @@ public class GoalService : IGoalService
         var goal = goals.FirstOrDefault();
 
         if (goal == null)
-        {
             throw new KeyNotFoundException("Meta não encontrada");
-        }
 
         _logger.LogInformation("Deleting goal {GoalId} for user {UserId}", goalId, userId);
 
