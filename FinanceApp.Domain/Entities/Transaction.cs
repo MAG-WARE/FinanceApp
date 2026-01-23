@@ -15,9 +15,13 @@ public class Transaction : BaseEntity
     
     // Para transferências entre contas
     public Guid? DestinationAccountId { get; set; }
-    
+
+    // Para vincular a uma meta
+    public Guid? GoalId { get; set; }
+
     // Navigation properties
     public Account Account { get; set; } = null!;
     public Category Category { get; set; } = null!;
     public Account? DestinationAccount { get; set; }
+    public Goal? Goal { get; set; }
 }

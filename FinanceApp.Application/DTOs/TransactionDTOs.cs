@@ -17,6 +17,8 @@ public class TransactionDto
     public string? Notes { get; set; }
     public Guid? DestinationAccountId { get; set; }
     public string? DestinationAccountName { get; set; }
+    public Guid? GoalId { get; set; }
+    public string? GoalName { get; set; }
 }
 
 public class CreateTransactionDto
@@ -30,6 +32,7 @@ public class CreateTransactionDto
     public bool IsRecurring { get; set; }
     public string? Notes { get; set; }
     public Guid? DestinationAccountId { get; set; }
+    public Guid? GoalId { get; set; }
 }
 
 public class UpdateTransactionDto
@@ -39,4 +42,5 @@ public class UpdateTransactionDto
     public DateTime Date { get; set; }
     public string Description { get; set; } = string.Empty;
     public string? Notes { get; set; }
+    public Guid? GoalId { get; set; }
 }
