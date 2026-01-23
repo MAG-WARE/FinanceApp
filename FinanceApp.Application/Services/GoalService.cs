@@ -48,6 +48,13 @@ public class GoalService : IGoalService
         goal.Id = Guid.NewGuid();
         goal.IsCompleted = false;
 
+        // Corrigir DateTime para UTC (PostgreSQL)
+        if (goal.StartDate.Kind != DateTimeKind.Utc)
+            goal.StartDate = DateTime.SpecifyKind(goal.StartDate, DateTimeKind.Utc);
+
+        if (goal.TargetDate.HasValue && goal.TargetDate.Value.Kind != DateTimeKind.Utc)
+            goal.TargetDate = DateTime.SpecifyKind(goal.TargetDate.Value, DateTimeKind.Utc);
+
         // Verificar se já atingiu a meta ao criar
         if (goal.CurrentAmount >= goal.TargetAmount)
         {
@@ -78,6 +85,10 @@ public class GoalService : IGoalService
         goal.TargetDate = dto.TargetDate;
         goal.Color = dto.Color;
         goal.Icon = dto.Icon;
+
+        // Corrigir DateTime para UTC (PostgreSQL)
+        if (goal.TargetDate.HasValue && goal.TargetDate.Value.Kind != DateTimeKind.Utc)
+            goal.TargetDate = DateTime.SpecifyKind(goal.TargetDate.Value, DateTimeKind.Utc);
 
         // Verificar se atingiu a meta
         if (goal.CurrentAmount >= goal.TargetAmount && !goal.IsCompleted)

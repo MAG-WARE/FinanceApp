@@ -142,6 +142,28 @@ public class FinanceAppDbContext : DbContext
             }
         }
 
+        // Converter todos os DateTime para UTC (corrigir problema com PostgreSQL)
+        var allEntries = ChangeTracker.Entries()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
+
+        foreach (var entry in allEntries)
+        {
+            foreach (var property in entry.Properties)
+            {
+                if (property.CurrentValue is DateTime dateTime)
+                {
+                    if (dateTime.Kind == DateTimeKind.Unspecified)
+                    {
+                        property.CurrentValue = DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
+                    }
+                    else if (dateTime.Kind == DateTimeKind.Local)
+                    {
+                        property.CurrentValue = dateTime.ToUniversalTime();
+                    }
+                }
+            }
+        }
+
         return base.SaveChangesAsync(cancellationToken);
     }
 }
