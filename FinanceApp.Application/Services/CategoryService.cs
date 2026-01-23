@@ -97,6 +97,7 @@ public class CategoryService : ICategoryService
             _logger.LogInformation("Validações concluídas. Atualizando categoria no banco...");
 
             category.Name = dto.Name;
+            category.Type = dto.Type;
             category.Color = dto.Color;
             category.Icon = dto.Icon;
 

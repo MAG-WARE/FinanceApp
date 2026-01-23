@@ -123,4 +123,16 @@ public class AccountController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Alterna o status ativo/inativo da conta
+    /// </summary>
+    [HttpPatch("{id}/toggle-active")]
+    public async Task<ActionResult<AccountDto>> ToggleActive(Guid id)
+    {
+        var userId = GetUserId();
+        var account = await _accountService.ToggleActiveStatusAsync(id, userId);
+
+        return Ok(account);
+    }
 }

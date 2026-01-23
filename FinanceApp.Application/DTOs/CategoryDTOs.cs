@@ -23,6 +23,7 @@ public class CreateCategoryDto
 public class UpdateCategoryDto
 {
     public string Name { get; set; } = string.Empty;
+    public CategoryType Type { get; set; }
     public string? Color { get; set; }
     public string? Icon { get; set; }
 }

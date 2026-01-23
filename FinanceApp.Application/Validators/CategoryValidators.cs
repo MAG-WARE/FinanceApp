@@ -23,5 +23,8 @@ public class UpdateCategoryDtoValidator : AbstractValidator<UpdateCategoryDto>
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Nome da categoria é obrigatório")
             .MaximumLength(100).WithMessage("Nome deve ter no máximo 100 caracteres");
+
+        RuleFor(x => x.Type)
+            .IsInEnum().WithMessage("Tipo de categoria inválido");
     }
 }

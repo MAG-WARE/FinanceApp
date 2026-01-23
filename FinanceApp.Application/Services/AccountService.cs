@@ -202,6 +202,56 @@ public class AccountService : IAccountService
         return await MapAccountsWithBalance(accounts);
     }
 
+    public async Task<AccountDto> ToggleActiveStatusAsync(Guid accountId, Guid userId)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Iniciando toggle de status da conta - AccountId: {AccountId}, UserId: {UserId}",
+                accountId, userId);
+
+            var accounts = await _accountRepository.FindAsync(a => a.Id == accountId && a.UserId == userId);
+            var account = accounts.FirstOrDefault();
+
+            if (account == null)
+            {
+                _logger.LogWarning("Conta não encontrada ou não pertence ao usuário - AccountId: {AccountId}, UserId: {UserId}",
+                    accountId, userId);
+                throw new KeyNotFoundException($"Conta com ID {accountId} não encontrada");
+            }
+
+            _logger.LogInformation("Alternando status - CurrentStatus: {CurrentStatus}", account.IsActive);
+
+            account.IsActive = !account.IsActive;
+
+            try
+            {
+                await _accountRepository.UpdateAsync(account);
+
+                _logger.LogInformation("Status da conta alternado com sucesso - AccountId: {AccountId}, NewStatus: {NewStatus}",
+                    accountId, account.IsActive);
+
+                var accountDto = _mapper.Map<AccountDto>(account);
+                accountDto.CurrentBalance = await CalculateAccountBalance(accountId);
+                return accountDto;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Erro ao alternar status da conta no banco - AccountId: {AccountId}, UserId: {UserId}. Erro: {ErrorMessage}",
+                    accountId, userId, ex.Message);
+                throw;
+            }
+        }
+        catch (Exception ex) when (ex is not KeyNotFoundException && ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex,
+                "Erro inesperado ao alternar status da conta - AccountId: {AccountId}, UserId: {UserId}",
+                accountId, userId);
+            throw new InvalidOperationException($"Erro ao alternar status da conta: {ex.Message}", ex);
+        }
+    }
+
     private async Task<decimal> CalculateAccountBalance(Guid accountId)
     {
         var account = await _accountRepository.GetByIdAsync(accountId);

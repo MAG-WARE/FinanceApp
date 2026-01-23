@@ -181,7 +181,10 @@ public class TransactionService : ITransactionService
                 "Iniciando atualização de transação - TransactionId: {TransactionId}, UserId: {UserId}, NewAmount: {Amount}",
                 transactionId, userId, dto.Amount);
 
-            var transaction = await _transactionRepository.GetByIdAsync(transactionId);
+            // Buscar transação usando FindAsync para evitar problemas de tracking
+            var transactions = await _transactionRepository.FindAsync(t => t.Id == transactionId);
+            var transaction = transactions.FirstOrDefault();
+
             if (transaction == null)
             {
                 _logger.LogWarning("Transação não encontrada para atualização: {TransactionId}", transactionId);
@@ -189,7 +192,9 @@ public class TransactionService : ITransactionService
             }
 
             // Verificar que a transação pertence ao usuário
-            var account = await _accountRepository.GetByIdAsync(transaction.AccountId);
+            var accounts = await _accountRepository.FindAsync(a => a.Id == transaction.AccountId);
+            var account = accounts.FirstOrDefault();
+
             if (account == null)
             {
                 _logger.LogWarning("Conta da transação não encontrada: {AccountId}", transaction.AccountId);
@@ -204,7 +209,9 @@ public class TransactionService : ITransactionService
             }
 
             // Validar que a categoria pertence ao usuário
-            var category = await _categoryRepository.GetByIdAsync(dto.CategoryId);
+            var categories = await _categoryRepository.FindAsync(c => c.Id == dto.CategoryId);
+            var category = categories.FirstOrDefault();
+
             if (category == null)
             {
                 _logger.LogWarning("Categoria não encontrada: {CategoryId}", dto.CategoryId);
@@ -225,6 +232,9 @@ public class TransactionService : ITransactionService
             transaction.Date = dto.Date;
             transaction.Description = dto.Description;
             transaction.Notes = dto.Notes;
+
+            if (transaction.Date.Kind != DateTimeKind.Utc)
+                transaction.Date = DateTime.SpecifyKind(transaction.Date, DateTimeKind.Utc);
 
             try
             {

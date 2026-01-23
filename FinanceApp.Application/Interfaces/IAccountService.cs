@@ -10,4 +10,5 @@ public interface IAccountService
     Task<AccountDto> UpdateAccountAsync(Guid accountId, UpdateAccountDto dto, Guid userId);
     Task DeleteAccountAsync(Guid accountId, Guid userId);
     Task<IEnumerable<AccountDto>> GetActiveAccountsAsync(Guid userId);
+    Task<AccountDto> ToggleActiveStatusAsync(Guid accountId, Guid userId);
 }
