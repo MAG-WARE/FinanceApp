@@ -93,6 +93,7 @@ public class BudgetService : IBudgetService
             var budget = _mapper.Map<Budget>(dto);
             budget.UserId = userId;
             budget.Id = Guid.NewGuid();
+            budget.CreatedAt = DateTime.UtcNow; // Garantir que CreatedAt está em UTC
 
             try
             {
@@ -260,8 +261,8 @@ public class BudgetService : IBudgetService
 
     private async Task<decimal> CalculateSpentAmount(Guid userId, Guid categoryId, int month, int year)
     {
-        var startDate = new DateTime(year, month, 1);
-        var endDate = startDate.AddMonths(1).AddDays(-1);
+        var startDate = DateTime.SpecifyKind(new DateTime(year, month, 1), DateTimeKind.Utc);
+        var endDate = DateTime.SpecifyKind(startDate.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
 
         var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
         var accountIds = userAccounts.Select(a => a.Id).ToList();
