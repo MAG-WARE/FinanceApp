@@ -23,7 +23,6 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// Configure Swagger with JWT support
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -66,7 +65,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:3001")
+        policy.WithOrigins("http://localhost:3000", "http://localhost:3001", "https://localhost:3000", "https://localhost:3001")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -97,7 +96,6 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// Configure AutoMapper
 var mapperConfig = new AutoMapper.MapperConfiguration(cfg =>
 {
     cfg.AddProfile<MappingProfile>();
@@ -105,10 +103,8 @@ var mapperConfig = new AutoMapper.MapperConfiguration(cfg =>
 var mapper = mapperConfig.CreateMapper();
 builder.Services.AddSingleton<AutoMapper.IMapper>(mapper);
 
-// Register Repositories
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
-// Register Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
@@ -128,7 +124,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Global exception handling middleware
 app.UseExceptionHandlingMiddleware();
 
 app.UseSerilogRequestLogging();
