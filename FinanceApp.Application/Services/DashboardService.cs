@@ -33,24 +33,32 @@ public class DashboardService : IDashboardService
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryByMonthAsync(Guid userId, int month, int year)
     {
-        var startDate = new DateTime(year, month, 1);
-        var endDate = startDate.AddMonths(1).AddDays(-1);
+        var startDate = DateTime.SpecifyKind(new DateTime(year, month, 1), DateTimeKind.Utc);
+        var endDate = DateTime.SpecifyKind(startDate.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
 
         return await GetDashboardSummaryByDateRangeAsync(userId, startDate, endDate);
     }
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryByDateRangeAsync(Guid userId, DateTime startDate, DateTime endDate)
     {
+        // Garantir que as datas estão em UTC para PostgreSQL
+        var startDateUtc = startDate.Kind == DateTimeKind.Utc
+            ? startDate
+            : DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+        var endDateUtc = endDate.Kind == DateTimeKind.Utc
+            ? endDate
+            : DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+
         _logger.LogInformation("Getting dashboard summary for user {UserId} from {StartDate} to {EndDate}",
-            userId, startDate, endDate);
+            userId, startDateUtc, endDateUtc);
 
         var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var transactions = await _transactionRepository.FindAsync(t =>
             accountIds.Contains(t.AccountId) &&
-            t.Date >= startDate &&
-            t.Date <= endDate);
+            t.Date >= startDateUtc &&
+            t.Date <= endDateUtc);
 
         var totalIncome = transactions
             .Where(t => t.Type == TransactionType.Income)
@@ -96,15 +104,15 @@ public class DashboardService : IDashboardService
         var balanceHistory = await GetBalanceHistoryAsync(userId, 6);
 
         // Comparativo com mês anterior
-        var comparison = await GetComparisonWithPreviousMonthAsync(userId, startDate);
+        var comparison = await GetComparisonWithPreviousMonthAsync(userId, startDateUtc);
 
         return new DashboardSummaryDto
         {
             TotalIncome = totalIncome,
             TotalExpenses = totalExpenses,
             Balance = balance,
-            Month = startDate.Month,
-            Year = startDate.Year,
+            Month = startDateUtc.Month,
+            Year = startDateUtc.Year,
             TopSpendingCategories = topSpendingCategories,
             BalanceHistory = balanceHistory,
             Comparison = comparison
@@ -122,8 +130,8 @@ public class DashboardService : IDashboardService
         for (int i = numberOfMonths - 1; i >= 0; i--)
         {
             var targetDate = currentDate.AddMonths(-i);
-            var startDate = new DateTime(targetDate.Year, targetDate.Month, 1);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var startDate = DateTime.SpecifyKind(new DateTime(targetDate.Year, targetDate.Month, 1), DateTimeKind.Utc);
+            var endDate = DateTime.SpecifyKind(startDate.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
 
             var transactions = await _transactionRepository.FindAsync(t =>
                 accountIds.Contains(t.AccountId) &&
@@ -156,11 +164,16 @@ public class DashboardService : IDashboardService
         var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
+        // Garantir que a data está em UTC
+        var currentMonthStartUtc = currentMonthStart.Kind == DateTimeKind.Utc
+            ? currentMonthStart
+            : DateTime.SpecifyKind(currentMonthStart, DateTimeKind.Utc);
+
         // Mês atual
-        var currentMonthEnd = currentMonthStart.AddMonths(1).AddDays(-1);
+        var currentMonthEnd = DateTime.SpecifyKind(currentMonthStartUtc.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
         var currentTransactions = await _transactionRepository.FindAsync(t =>
             accountIds.Contains(t.AccountId) &&
-            t.Date >= currentMonthStart &&
+            t.Date >= currentMonthStartUtc &&
             t.Date <= currentMonthEnd);
 
         var currentIncome = currentTransactions
@@ -172,8 +185,8 @@ public class DashboardService : IDashboardService
             .Sum(t => t.Amount);
 
         // Mês anterior
-        var previousMonthStart = currentMonthStart.AddMonths(-1);
-        var previousMonthEnd = previousMonthStart.AddMonths(1).AddDays(-1);
+        var previousMonthStart = DateTime.SpecifyKind(currentMonthStartUtc.AddMonths(-1), DateTimeKind.Utc);
+        var previousMonthEnd = DateTime.SpecifyKind(previousMonthStart.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
         var previousTransactions = await _transactionRepository.FindAsync(t =>
             accountIds.Contains(t.AccountId) &&
             t.Date >= previousMonthStart &&
