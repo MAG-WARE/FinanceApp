@@ -29,13 +29,17 @@ public class TransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas as transações do usuário com paginação
+    /// Lista todas as transações do usuário com paginação (com suporte a ViewContext)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetAll([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
+    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetAll(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var transactions = await _transactionService.GetAllTransactionsAsync(userId, pageNumber, pageSize);
+        var transactions = await _transactionService.GetAllTransactionsAsync(userId, context, memberUserId, pageNumber, pageSize);
         return Ok(transactions);
     }
 
@@ -82,10 +86,13 @@ public class TransactionController : ControllerBase
     /// Lista transações por tipo (Income, Expense, Transfer)
     /// </summary>
     [HttpGet("type/{type}")]
-    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetByType(TransactionType type)
+    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetByType(
+        TransactionType type,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var transactions = await _transactionService.GetTransactionsByTypeAsync(userId, type);
+        var transactions = await _transactionService.GetTransactionsByTypeAsync(userId, type, context, memberUserId);
         return Ok(transactions);
     }
 
@@ -93,10 +100,14 @@ public class TransactionController : ControllerBase
     /// Lista transações por período
     /// </summary>
     [HttpGet("date-range")]
-    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetByDateRange([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+    public async Task<ActionResult<IEnumerable<TransactionDto>>> GetByDateRange(
+        [FromQuery] DateTime startDate,
+        [FromQuery] DateTime endDate,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var transactions = await _transactionService.GetTransactionsByDateRangeAsync(userId, startDate, endDate);
+        var transactions = await _transactionService.GetTransactionsByDateRangeAsync(userId, startDate, endDate, context, memberUserId);
         return Ok(transactions);
     }
 

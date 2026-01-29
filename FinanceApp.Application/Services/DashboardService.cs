@@ -11,36 +11,56 @@ public class DashboardService : IDashboardService
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Category> _categoryRepository;
+    private readonly IUserGroupService _userGroupService;
     private readonly ILogger<DashboardService> _logger;
 
     public DashboardService(
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
         IRepository<Category> categoryRepository,
+        IUserGroupService userGroupService,
         ILogger<DashboardService> logger)
     {
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _categoryRepository = categoryRepository;
+        _userGroupService = userGroupService;
         _logger = logger;
     }
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(Guid userId)
     {
+        return await GetDashboardSummaryAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
         var now = DateTime.UtcNow;
-        return await GetDashboardSummaryByMonthAsync(userId, now.Month, now.Year);
+        return await GetDashboardSummaryByMonthAsync(userId, now.Month, now.Year, context, memberUserId);
     }
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryByMonthAsync(Guid userId, int month, int year)
     {
+        return await GetDashboardSummaryByMonthAsync(userId, month, year, ViewContext.Own, null);
+    }
+
+    public async Task<DashboardSummaryDto> GetDashboardSummaryByMonthAsync(Guid userId, int month, int year, ViewContext context, Guid? memberUserId = null)
+    {
         var startDate = DateTime.SpecifyKind(new DateTime(year, month, 1), DateTimeKind.Utc);
         var endDate = DateTime.SpecifyKind(startDate.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
 
-        return await GetDashboardSummaryByDateRangeAsync(userId, startDate, endDate);
+        return await GetDashboardSummaryByDateRangeAsync(userId, startDate, endDate, context, memberUserId);
     }
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryByDateRangeAsync(Guid userId, DateTime startDate, DateTime endDate)
     {
+        return await GetDashboardSummaryByDateRangeAsync(userId, startDate, endDate, ViewContext.Own, null);
+    }
+
+    public async Task<DashboardSummaryDto> GetDashboardSummaryByDateRangeAsync(Guid userId, DateTime startDate, DateTime endDate, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
         // Garantir que as datas estão em UTC para PostgreSQL
         var startDateUtc = startDate.Kind == DateTimeKind.Utc
             ? startDate
@@ -49,10 +69,10 @@ public class DashboardService : IDashboardService
             ? endDate
             : DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
 
-        _logger.LogInformation("Getting dashboard summary for user {UserId} from {StartDate} to {EndDate}",
-            userId, startDateUtc, endDateUtc);
+        _logger.LogInformation("Getting dashboard summary for user {UserId} with context {Context} from {StartDate} to {EndDate}",
+            userId, context, startDateUtc, endDateUtc);
 
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        var userAccounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var transactions = await _transactionRepository.FindAsync(t =>
@@ -101,10 +121,10 @@ public class DashboardService : IDashboardService
         }
 
         // Evolução do saldo nos últimos 6 meses
-        var balanceHistory = await GetBalanceHistoryAsync(userId, 6);
+        var balanceHistory = await GetBalanceHistoryAsync(accessibleUserIds, 6);
 
         // Comparativo com mês anterior
-        var comparison = await GetComparisonWithPreviousMonthAsync(userId, startDateUtc);
+        var comparison = await GetComparisonWithPreviousMonthAsync(accessibleUserIds, startDateUtc);
 
         return new DashboardSummaryDto
         {
@@ -119,9 +139,9 @@ public class DashboardService : IDashboardService
         };
     }
 
-    private async Task<List<MonthlyBalanceDto>> GetBalanceHistoryAsync(Guid userId, int numberOfMonths)
+    private async Task<List<MonthlyBalanceDto>> GetBalanceHistoryAsync(IEnumerable<Guid> userIds, int numberOfMonths)
     {
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        var userAccounts = await _accountRepository.FindAsync(a => userIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var balanceHistory = new List<MonthlyBalanceDto>();
@@ -159,9 +179,9 @@ public class DashboardService : IDashboardService
         return balanceHistory;
     }
 
-    private async Task<ComparisonDto> GetComparisonWithPreviousMonthAsync(Guid userId, DateTime currentMonthStart)
+    private async Task<ComparisonDto> GetComparisonWithPreviousMonthAsync(IEnumerable<Guid> userIds, DateTime currentMonthStart)
     {
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        var userAccounts = await _accountRepository.FindAsync(a => userIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         // Garantir que a data está em UTC

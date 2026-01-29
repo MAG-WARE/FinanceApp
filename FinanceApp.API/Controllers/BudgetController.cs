@@ -1,6 +1,7 @@
 using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Application.Validators;
+using FinanceApp.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -28,13 +29,15 @@ public class BudgetController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todos os orçamentos do usuário
+    /// Lista todos os orçamentos do usuário (com suporte a ViewContext)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<BudgetDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<BudgetDto>>> GetAll(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var budgets = await _budgetService.GetAllBudgetsAsync(userId);
+        var budgets = await _budgetService.GetAllBudgetsAsync(userId, context, memberUserId);
         return Ok(budgets);
     }
 
@@ -59,10 +62,14 @@ public class BudgetController : ControllerBase
     /// Lista orçamentos por mês/ano
     /// </summary>
     [HttpGet("month/{year}/{month}")]
-    public async Task<ActionResult<IEnumerable<BudgetDto>>> GetByMonth(int year, int month)
+    public async Task<ActionResult<IEnumerable<BudgetDto>>> GetByMonth(
+        int year,
+        int month,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var budgets = await _budgetService.GetBudgetsByMonthAsync(userId, month, year);
+        var budgets = await _budgetService.GetBudgetsByMonthAsync(userId, month, year, context, memberUserId);
         return Ok(budgets);
     }
 
@@ -70,10 +77,14 @@ public class BudgetController : ControllerBase
     /// Obtém o status dos orçamentos do mês (gastos vs limites)
     /// </summary>
     [HttpGet("status/{year}/{month}")]
-    public async Task<ActionResult<IEnumerable<BudgetStatusDto>>> GetStatus(int year, int month)
+    public async Task<ActionResult<IEnumerable<BudgetStatusDto>>> GetStatus(
+        int year,
+        int month,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var status = await _budgetService.GetBudgetStatusAsync(userId, month, year);
+        var status = await _budgetService.GetBudgetStatusAsync(userId, month, year, context, memberUserId);
         return Ok(status);
     }
 

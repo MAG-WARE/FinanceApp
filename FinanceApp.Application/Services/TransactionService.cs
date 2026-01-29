@@ -12,6 +12,7 @@ public class TransactionService : ITransactionService
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Category> _categoryRepository;
+    private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<TransactionService> _logger;
 
@@ -19,23 +20,32 @@ public class TransactionService : ITransactionService
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
         IRepository<Category> categoryRepository,
+        IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<TransactionService> logger)
     {
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _categoryRepository = categoryRepository;
+        _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<TransactionDto>> GetAllTransactionsAsync(Guid userId, int pageNumber = 1, int pageSize = 50)
     {
-        // Buscar contas do usuário
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        return await GetAllTransactionsAsync(userId, ViewContext.Own, null, pageNumber, pageSize);
+    }
+
+    public async Task<IEnumerable<TransactionDto>> GetAllTransactionsAsync(Guid userId, ViewContext context, Guid? memberUserId = null, int pageNumber = 1, int pageSize = 50)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
+        // Buscar contas dos usuários acessíveis
+        var userAccounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
-        // Buscar transações das contas do usuário
+        // Buscar transações das contas
         var transactions = await _transactionRepository.FindAsync(t => accountIds.Contains(t.AccountId));
 
         var orderedTransactions = transactions
@@ -347,7 +357,13 @@ public class TransactionService : ITransactionService
 
     public async Task<IEnumerable<TransactionDto>> GetTransactionsByTypeAsync(Guid userId, TransactionType type)
     {
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        return await GetTransactionsByTypeAsync(userId, type, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<TransactionDto>> GetTransactionsByTypeAsync(Guid userId, TransactionType type, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var userAccounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var transactions = await _transactionRepository.FindAsync(t =>
@@ -360,7 +376,13 @@ public class TransactionService : ITransactionService
 
     public async Task<IEnumerable<TransactionDto>> GetTransactionsByDateRangeAsync(Guid userId, DateTime startDate, DateTime endDate)
     {
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        return await GetTransactionsByDateRangeAsync(userId, startDate, endDate, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<TransactionDto>> GetTransactionsByDateRangeAsync(Guid userId, DateTime startDate, DateTime endDate, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var userAccounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var transactions = await _transactionRepository.FindAsync(t =>

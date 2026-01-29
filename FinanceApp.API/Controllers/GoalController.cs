@@ -1,6 +1,7 @@
 using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Application.Validators;
+using FinanceApp.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -28,13 +29,15 @@ public class GoalController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas as metas do usuário
+    /// Lista todas as metas do usuário (com suporte a ViewContext)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<GoalDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<GoalDto>>> GetAll(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var goals = await _goalService.GetAllGoalsAsync(userId);
+        var goals = await _goalService.GetAllGoalsAsync(userId, context, memberUserId);
         return Ok(goals);
     }
 
@@ -42,10 +45,12 @@ public class GoalController : ControllerBase
     /// Lista apenas metas ativas (não completadas)
     /// </summary>
     [HttpGet("active")]
-    public async Task<ActionResult<IEnumerable<GoalDto>>> GetActive()
+    public async Task<ActionResult<IEnumerable<GoalDto>>> GetActive(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var goals = await _goalService.GetActiveGoalsAsync(userId);
+        var goals = await _goalService.GetActiveGoalsAsync(userId, context, memberUserId);
         return Ok(goals);
     }
 
@@ -53,10 +58,23 @@ public class GoalController : ControllerBase
     /// Lista apenas metas completadas
     /// </summary>
     [HttpGet("completed")]
-    public async Task<ActionResult<IEnumerable<GoalDto>>> GetCompleted()
+    public async Task<ActionResult<IEnumerable<GoalDto>>> GetCompleted(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var goals = await _goalService.GetCompletedGoalsAsync(userId);
+        var goals = await _goalService.GetCompletedGoalsAsync(userId, context, memberUserId);
+        return Ok(goals);
+    }
+
+    /// <summary>
+    /// Lista metas compartilhadas com o usuário (onde não é owner)
+    /// </summary>
+    [HttpGet("shared")]
+    public async Task<ActionResult<IEnumerable<GoalDto>>> GetShared()
+    {
+        var userId = GetUserId();
+        var goals = await _goalService.GetSharedGoalsAsync(userId);
         return Ok(goals);
     }
 

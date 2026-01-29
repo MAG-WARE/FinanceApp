@@ -11,24 +11,33 @@ public class AccountService : IAccountService
 {
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Transaction> _transactionRepository;
+    private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<AccountService> _logger;
 
     public AccountService(
         IRepository<Account> accountRepository,
         IRepository<Transaction> transactionRepository,
+        IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<AccountService> logger)
     {
         _accountRepository = accountRepository;
         _transactionRepository = transactionRepository;
+        _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<AccountDto>> GetAllAccountsAsync(Guid userId)
     {
-        var accounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        return await GetAllAccountsAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<AccountDto>> GetAllAccountsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var accounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         return await MapAccountsWithBalance(accounts);
     }
 
@@ -198,7 +207,13 @@ public class AccountService : IAccountService
 
     public async Task<IEnumerable<AccountDto>> GetActiveAccountsAsync(Guid userId)
     {
-        var accounts = await _accountRepository.FindAsync(a => a.UserId == userId && a.IsActive);
+        return await GetActiveAccountsAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<AccountDto>> GetActiveAccountsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var accounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId) && a.IsActive);
         return await MapAccountsWithBalance(accounts);
     }
 

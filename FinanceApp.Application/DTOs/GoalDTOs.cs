@@ -15,6 +15,13 @@ public class GoalDto
     public decimal ProgressPercentage { get; set; }
     public decimal RemainingAmount { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    // Ownership info
+    public Guid OwnerId { get; set; }
+    public string OwnerName { get; set; } = string.Empty;
+    public bool IsOwner { get; set; }
+    public bool IsShared { get; set; }
+    public List<GoalUserDto> SharedWith { get; set; } = new();
 }
 
 public class CreateGoalDto

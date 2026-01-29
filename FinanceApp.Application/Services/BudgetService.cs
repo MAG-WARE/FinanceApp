@@ -13,6 +13,7 @@ public class BudgetService : IBudgetService
     private readonly IRepository<Category> _categoryRepository;
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
+    private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<BudgetService> _logger;
 
@@ -21,6 +22,7 @@ public class BudgetService : IBudgetService
         IRepository<Category> categoryRepository,
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
+        IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<BudgetService> logger)
     {
@@ -28,14 +30,21 @@ public class BudgetService : IBudgetService
         _categoryRepository = categoryRepository;
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
+        _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<BudgetDto>> GetAllBudgetsAsync(Guid userId)
     {
-        var budgets = await _budgetRepository.FindAsync(b => b.UserId == userId);
-        return await MapBudgetsWithSpending(budgets, userId);
+        return await GetAllBudgetsAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<BudgetDto>> GetAllBudgetsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var budgets = await _budgetRepository.FindAsync(b => accessibleUserIds.Contains(b.UserId));
+        return await MapBudgetsWithSpending(budgets, accessibleUserIds);
     }
 
     public async Task<BudgetDto?> GetBudgetByIdAsync(Guid budgetId, Guid userId)
@@ -218,8 +227,15 @@ public class BudgetService : IBudgetService
 
     public async Task<IEnumerable<BudgetStatusDto>> GetBudgetStatusAsync(Guid userId, int month, int year)
     {
+        return await GetBudgetStatusAsync(userId, month, year, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<BudgetStatusDto>> GetBudgetStatusAsync(Guid userId, int month, int year, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
         var budgets = await _budgetRepository.FindAsync(b =>
-            b.UserId == userId &&
+            accessibleUserIds.Contains(b.UserId) &&
             b.Month == month &&
             b.Year == year);
 
@@ -228,7 +244,7 @@ public class BudgetService : IBudgetService
         foreach (var budget in budgets)
         {
             var category = await _categoryRepository.GetByIdAsync(budget.CategoryId);
-            var spentAmount = await CalculateSpentAmount(userId, budget.CategoryId, month, year);
+            var spentAmount = await CalculateSpentAmount(accessibleUserIds, budget.CategoryId, month, year);
             var remainingAmount = budget.LimitAmount - spentAmount;
             var percentageUsed = budget.LimitAmount > 0 ? (spentAmount / budget.LimitAmount) * 100 : 0;
 
@@ -251,20 +267,27 @@ public class BudgetService : IBudgetService
 
     public async Task<IEnumerable<BudgetDto>> GetBudgetsByMonthAsync(Guid userId, int month, int year)
     {
+        return await GetBudgetsByMonthAsync(userId, month, year, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<BudgetDto>> GetBudgetsByMonthAsync(Guid userId, int month, int year, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
         var budgets = await _budgetRepository.FindAsync(b =>
-            b.UserId == userId &&
+            accessibleUserIds.Contains(b.UserId) &&
             b.Month == month &&
             b.Year == year);
 
-        return await MapBudgetsWithSpending(budgets, userId);
+        return await MapBudgetsWithSpending(budgets, accessibleUserIds);
     }
 
-    private async Task<decimal> CalculateSpentAmount(Guid userId, Guid categoryId, int month, int year)
+    private async Task<decimal> CalculateSpentAmount(IEnumerable<Guid> userIds, Guid categoryId, int month, int year)
     {
         var startDate = DateTime.SpecifyKind(new DateTime(year, month, 1), DateTimeKind.Utc);
         var endDate = DateTime.SpecifyKind(startDate.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
 
-        var userAccounts = await _accountRepository.FindAsync(a => a.UserId == userId);
+        var userAccounts = await _accountRepository.FindAsync(a => userIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
         var transactions = await _transactionRepository.FindAsync(t =>
@@ -277,14 +300,14 @@ public class BudgetService : IBudgetService
         return transactions.Sum(t => t.Amount);
     }
 
-    private async Task<IEnumerable<BudgetDto>> MapBudgetsWithSpending(IEnumerable<Budget> budgets, Guid userId)
+    private async Task<IEnumerable<BudgetDto>> MapBudgetsWithSpending(IEnumerable<Budget> budgets, IEnumerable<Guid> userIds)
     {
         var budgetDtos = new List<BudgetDto>();
 
         foreach (var budget in budgets)
         {
             var category = await _categoryRepository.GetByIdAsync(budget.CategoryId);
-            var spentAmount = await CalculateSpentAmount(userId, budget.CategoryId, budget.Month, budget.Year);
+            var spentAmount = await CalculateSpentAmount(userIds, budget.CategoryId, budget.Month, budget.Year);
             var remainingAmount = budget.LimitAmount - spentAmount;
             var percentageUsed = budget.LimitAmount > 0 ? (spentAmount / budget.LimitAmount) * 100 : 0;
 

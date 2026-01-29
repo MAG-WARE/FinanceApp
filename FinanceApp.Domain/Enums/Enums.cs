@@ -21,3 +21,16 @@ public enum CategoryType
     Income = 1,
     Expense = 2
 }
+
+public enum GroupRole
+{
+    Owner = 1,
+    Member = 2
+}
+
+public enum ViewContext
+{
+    Own = 1,
+    Member = 2,
+    All = 3
+}

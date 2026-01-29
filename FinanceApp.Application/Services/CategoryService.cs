@@ -10,22 +10,31 @@ namespace FinanceApp.Application.Services;
 public class CategoryService : ICategoryService
 {
     private readonly IRepository<Category> _categoryRepository;
+    private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<CategoryService> _logger;
 
     public CategoryService(
         IRepository<Category> categoryRepository,
+        IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<CategoryService> logger)
     {
         _categoryRepository = categoryRepository;
+        _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<CategoryDto>> GetAllCategoriesAsync(Guid userId)
     {
-        var categories = await _categoryRepository.FindAsync(c => c.UserId == userId);
+        return await GetAllCategoriesAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<CategoryDto>> GetAllCategoriesAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var categories = await _categoryRepository.FindAsync(c => accessibleUserIds.Contains(c.UserId));
         return _mapper.Map<IEnumerable<CategoryDto>>(categories);
     }
 
@@ -172,7 +181,13 @@ public class CategoryService : ICategoryService
 
     public async Task<IEnumerable<CategoryDto>> GetCategoriesByTypeAsync(Guid userId, CategoryType type)
     {
-        var categories = await _categoryRepository.FindAsync(c => c.UserId == userId && c.Type == type);
+        return await GetCategoriesByTypeAsync(userId, type, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<CategoryDto>> GetCategoriesByTypeAsync(Guid userId, CategoryType type, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+        var categories = await _categoryRepository.FindAsync(c => accessibleUserIds.Contains(c.UserId) && c.Type == type);
         return _mapper.Map<IEnumerable<CategoryDto>>(categories);
     }
 

@@ -1,6 +1,7 @@
 using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Application.Validators;
+using FinanceApp.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -28,13 +29,15 @@ public class AccountController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas as contas do usuário
+    /// Lista todas as contas do usuário (com suporte a ViewContext)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AccountDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<AccountDto>>> GetAll(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var accounts = await _accountService.GetAllAccountsAsync(userId);
+        var accounts = await _accountService.GetAllAccountsAsync(userId, context, memberUserId);
         return Ok(accounts);
     }
 
@@ -42,10 +45,12 @@ public class AccountController : ControllerBase
     /// Lista apenas contas ativas do usuário
     /// </summary>
     [HttpGet("active")]
-    public async Task<ActionResult<IEnumerable<AccountDto>>> GetActive()
+    public async Task<ActionResult<IEnumerable<AccountDto>>> GetActive(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var accounts = await _accountService.GetActiveAccountsAsync(userId);
+        var accounts = await _accountService.GetActiveAccountsAsync(userId, context, memberUserId);
         return Ok(accounts);
     }
 

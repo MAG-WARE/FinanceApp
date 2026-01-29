@@ -12,7 +12,10 @@ public class Goal : BaseEntity
     public bool IsCompleted { get; set; }
     public string? Color { get; set; }
     public string? Icon { get; set; }
-    
+
     // Navigation properties
     public User User { get; set; } = null!;
+
+    // Shared goals - N:N relationship with users
+    public ICollection<GoalUser> GoalUsers { get; set; } = new List<GoalUser>();
 }

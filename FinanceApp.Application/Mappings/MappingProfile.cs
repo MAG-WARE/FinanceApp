@@ -47,9 +47,32 @@ public class MappingProfile : Profile
         // Goal mappings
         CreateMap<Goal, GoalDto>()
             .ForMember(dest => dest.ProgressPercentage, opt => opt.Ignore())
-            .ForMember(dest => dest.RemainingAmount, opt => opt.Ignore());
+            .ForMember(dest => dest.RemainingAmount, opt => opt.Ignore())
+            .ForMember(dest => dest.OwnerId, opt => opt.MapFrom(src => src.UserId))
+            .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.User.Name))
+            .ForMember(dest => dest.IsOwner, opt => opt.Ignore())
+            .ForMember(dest => dest.IsShared, opt => opt.MapFrom(src => src.GoalUsers.Count > 1))
+            .ForMember(dest => dest.SharedWith, opt => opt.Ignore());
         CreateMap<CreateGoalDto, Goal>();
         CreateMap<UpdateGoalDto, Goal>()
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+        // UserGroup mappings
+        CreateMap<UserGroup, UserGroupDto>()
+            .ForMember(dest => dest.CreatedByUserName, opt => opt.MapFrom(src => src.CreatedByUser.Name))
+            .ForMember(dest => dest.MemberCount, opt => opt.MapFrom(src => src.Members.Count))
+            .ForMember(dest => dest.Members, opt => opt.MapFrom(src => src.Members));
+        CreateMap<CreateUserGroupDto, UserGroup>();
+        CreateMap<UpdateUserGroupDto, UserGroup>()
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+        // UserGroupMember mappings
+        CreateMap<UserGroupMember, GroupMemberDto>()
+            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.Name))
+            .ForMember(dest => dest.UserEmail, opt => opt.MapFrom(src => src.User.Email));
+
+        // GoalUser mappings
+        CreateMap<GoalUser, GoalUserDto>()
+            .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.User.Name));
     }
 }

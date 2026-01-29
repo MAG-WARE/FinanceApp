@@ -29,13 +29,15 @@ public class CategoryController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas as categorias do usuário
+    /// Lista todas as categorias do usuário (com suporte a ViewContext)
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<CategoryDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<CategoryDto>>> GetAll(
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var categories = await _categoryService.GetAllCategoriesAsync(userId);
+        var categories = await _categoryService.GetAllCategoriesAsync(userId, context, memberUserId);
         return Ok(categories);
     }
 
@@ -43,10 +45,13 @@ public class CategoryController : ControllerBase
     /// Lista categorias por tipo (Income ou Expense)
     /// </summary>
     [HttpGet("type/{type}")]
-    public async Task<ActionResult<IEnumerable<CategoryDto>>> GetByType(CategoryType type)
+    public async Task<ActionResult<IEnumerable<CategoryDto>>> GetByType(
+        CategoryType type,
+        [FromQuery] ViewContext context = ViewContext.Own,
+        [FromQuery] Guid? memberUserId = null)
     {
         var userId = GetUserId();
-        var categories = await _categoryService.GetCategoriesByTypeAsync(userId, type);
+        var categories = await _categoryService.GetCategoriesByTypeAsync(userId, type, context, memberUserId);
         return Ok(categories);
     }
 

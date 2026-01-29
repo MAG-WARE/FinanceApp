@@ -2,41 +2,69 @@ using AutoMapper;
 using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Domain.Entities;
+using FinanceApp.Domain.Enums;
+using FinanceApp.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceApp.Application.Services;
 
 public class GoalService : IGoalService
 {
-    private readonly IRepository<Goal> _goalRepository;
+    private readonly FinanceAppDbContext _context;
+    private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<GoalService> _logger;
 
     public GoalService(
-        IRepository<Goal> goalRepository,
+        FinanceAppDbContext context,
+        IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<GoalService> logger)
     {
-        _goalRepository = goalRepository;
+        _context = context;
+        _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<GoalDto>> GetAllGoalsAsync(Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.UserId == userId);
-        return MapGoalsWithProgress(goals);
+        return await GetAllGoalsAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<GoalDto>> GetAllGoalsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
+        var goals = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .Where(g => accessibleUserIds.Contains(g.UserId) || g.GoalUsers.Any(gu => accessibleUserIds.Contains(gu.UserId)))
+            .Where(g => !g.IsDeleted)
+            .ToListAsync();
+
+        return MapGoalsWithProgress(goals, userId);
     }
 
     public async Task<GoalDto?> GetGoalByIdAsync(Guid goalId, Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.Id == goalId && g.UserId == userId);
-        var goal = goals.FirstOrDefault();
+        var goal = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .FirstOrDefaultAsync(g => g.Id == goalId && !g.IsDeleted);
 
         if (goal == null)
             return null;
 
-        return MapGoalsWithProgress(new[] { goal }).FirstOrDefault();
+        // Check access: user is owner or goal is shared with user
+        var hasAccess = goal.UserId == userId || goal.GoalUsers.Any(gu => gu.UserId == userId);
+        if (!hasAccess)
+            return null;
+
+        return MapGoalsWithProgress(new[] { goal }, userId).FirstOrDefault();
     }
 
     public async Task<GoalDto> CreateGoalAsync(CreateGoalDto dto, Guid userId)
@@ -57,18 +85,44 @@ public class GoalService : IGoalService
         if (goal.CurrentAmount >= goal.TargetAmount)
             goal.IsCompleted = true;
 
-        var createdGoal = await _goalRepository.AddAsync(goal);
+        _context.Goals.Add(goal);
 
-        return MapGoalsWithProgress(new[] { createdGoal }).First();
+        // Add owner to GoalUsers table
+        var goalUser = new GoalUser
+        {
+            GoalId = goal.Id,
+            UserId = userId,
+            IsOwner = true,
+            AddedAt = DateTime.UtcNow
+        };
+        _context.GoalUsers.Add(goalUser);
+
+        await _context.SaveChangesAsync();
+
+        // Reload with includes
+        var createdGoal = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .FirstAsync(g => g.Id == goal.Id);
+
+        return MapGoalsWithProgress(new[] { createdGoal }, userId).First();
     }
 
     public async Task<GoalDto> UpdateGoalAsync(Guid goalId, UpdateGoalDto dto, Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.Id == goalId && g.UserId == userId);
-        var goal = goals.FirstOrDefault();
+        var goal = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .FirstOrDefaultAsync(g => g.Id == goalId && !g.IsDeleted);
 
         if (goal == null)
             throw new KeyNotFoundException("Meta não encontrada");
+
+        // Only owner can update
+        if (goal.UserId != userId)
+            throw new UnauthorizedAccessException("Apenas o proprietário pode editar a meta");
 
         _logger.LogInformation("Updating goal {GoalId} for user {UserId}", goalId, userId);
 
@@ -91,37 +145,82 @@ public class GoalService : IGoalService
         else if (goal.CurrentAmount < goal.TargetAmount && goal.IsCompleted)
             goal.IsCompleted = false;
 
-        await _goalRepository.UpdateAsync(goal);
+        await _context.SaveChangesAsync();
 
-        return MapGoalsWithProgress(new[] { goal }).First();
+        return MapGoalsWithProgress(new[] { goal }, userId).First();
     }
 
     public async Task DeleteGoalAsync(Guid goalId, Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.Id == goalId && g.UserId == userId);
-        var goal = goals.FirstOrDefault();
+        var goal = await _context.Goals
+            .FirstOrDefaultAsync(g => g.Id == goalId && !g.IsDeleted);
 
         if (goal == null)
             throw new KeyNotFoundException("Meta não encontrada");
 
+        // Only owner can delete
+        if (goal.UserId != userId)
+            throw new UnauthorizedAccessException("Apenas o proprietário pode excluir a meta");
+
         _logger.LogInformation("Deleting goal {GoalId} for user {UserId}", goalId, userId);
 
-        await _goalRepository.DeleteAsync(goalId);
+        goal.IsDeleted = true;
+        await _context.SaveChangesAsync();
     }
 
     public async Task<IEnumerable<GoalDto>> GetActiveGoalsAsync(Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.UserId == userId && !g.IsCompleted);
-        return MapGoalsWithProgress(goals);
+        return await GetActiveGoalsAsync(userId, ViewContext.Own, null);
+    }
+
+    public async Task<IEnumerable<GoalDto>> GetActiveGoalsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
+        var goals = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .Where(g => (accessibleUserIds.Contains(g.UserId) || g.GoalUsers.Any(gu => accessibleUserIds.Contains(gu.UserId)))
+                        && !g.IsCompleted && !g.IsDeleted)
+            .ToListAsync();
+
+        return MapGoalsWithProgress(goals, userId);
     }
 
     public async Task<IEnumerable<GoalDto>> GetCompletedGoalsAsync(Guid userId)
     {
-        var goals = await _goalRepository.FindAsync(g => g.UserId == userId && g.IsCompleted);
-        return MapGoalsWithProgress(goals);
+        return await GetCompletedGoalsAsync(userId, ViewContext.Own, null);
     }
 
-    private IEnumerable<GoalDto> MapGoalsWithProgress(IEnumerable<Goal> goals)
+    public async Task<IEnumerable<GoalDto>> GetCompletedGoalsAsync(Guid userId, ViewContext context, Guid? memberUserId = null)
+    {
+        var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
+
+        var goals = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .Where(g => (accessibleUserIds.Contains(g.UserId) || g.GoalUsers.Any(gu => accessibleUserIds.Contains(gu.UserId)))
+                        && g.IsCompleted && !g.IsDeleted)
+            .ToListAsync();
+
+        return MapGoalsWithProgress(goals, userId);
+    }
+
+    public async Task<IEnumerable<GoalDto>> GetSharedGoalsAsync(Guid userId)
+    {
+        var goals = await _context.Goals
+            .Include(g => g.User)
+            .Include(g => g.GoalUsers)
+                .ThenInclude(gu => gu.User)
+            .Where(g => g.GoalUsers.Any(gu => gu.UserId == userId && !gu.IsOwner) && !g.IsDeleted)
+            .ToListAsync();
+
+        return MapGoalsWithProgress(goals, userId);
+    }
+
+    private IEnumerable<GoalDto> MapGoalsWithProgress(IEnumerable<Goal> goals, Guid currentUserId)
     {
         var goalDtos = new List<GoalDto>();
 
@@ -132,6 +231,16 @@ public class GoalService : IGoalService
                 ? Math.Min((goal.CurrentAmount / goal.TargetAmount) * 100, 100)
                 : 0;
             dto.RemainingAmount = Math.Max(goal.TargetAmount - goal.CurrentAmount, 0);
+            dto.IsOwner = goal.UserId == currentUserId;
+            dto.SharedWith = goal.GoalUsers
+                .Select(gu => new GoalUserDto
+                {
+                    UserId = gu.UserId,
+                    UserName = gu.User?.Name ?? "",
+                    IsOwner = gu.IsOwner,
+                    AddedAt = gu.AddedAt
+                })
+                .ToList();
 
             goalDtos.Add(dto);
         }
