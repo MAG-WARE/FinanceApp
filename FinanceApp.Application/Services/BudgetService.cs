@@ -13,6 +13,7 @@ public class BudgetService : IBudgetService
     private readonly IRepository<Category> _categoryRepository;
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
+    private readonly IRepository<User> _userRepository;
     private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<BudgetService> _logger;
@@ -22,6 +23,7 @@ public class BudgetService : IBudgetService
         IRepository<Category> categoryRepository,
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
+        IRepository<User> userRepository,
         IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<BudgetService> logger)
@@ -30,6 +32,7 @@ public class BudgetService : IBudgetService
         _categoryRepository = categoryRepository;
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
+        _userRepository = userRepository;
         _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
@@ -244,6 +247,7 @@ public class BudgetService : IBudgetService
         foreach (var budget in budgets)
         {
             var category = await _categoryRepository.GetByIdAsync(budget.CategoryId);
+            var user = await _userRepository.GetByIdAsync(budget.UserId);
             var spentAmount = await CalculateSpentAmount(accessibleUserIds, budget.CategoryId, month, year);
             var remainingAmount = budget.LimitAmount - spentAmount;
             var percentageUsed = budget.LimitAmount > 0 ? (spentAmount / budget.LimitAmount) * 100 : 0;
@@ -251,6 +255,8 @@ public class BudgetService : IBudgetService
             budgetStatuses.Add(new BudgetStatusDto
             {
                 Id = budget.Id,
+                UserId = budget.UserId,
+                UserName = user?.Name ?? "Usuário removido",
                 CategoryName = category?.Name ?? "Categoria removida",
                 Month = month,
                 Year = year,
@@ -307,11 +313,14 @@ public class BudgetService : IBudgetService
         foreach (var budget in budgets)
         {
             var category = await _categoryRepository.GetByIdAsync(budget.CategoryId);
+            var user = await _userRepository.GetByIdAsync(budget.UserId);
             var spentAmount = await CalculateSpentAmount(userIds, budget.CategoryId, budget.Month, budget.Year);
             var remainingAmount = budget.LimitAmount - spentAmount;
             var percentageUsed = budget.LimitAmount > 0 ? (spentAmount / budget.LimitAmount) * 100 : 0;
 
             var dto = _mapper.Map<BudgetDto>(budget);
+            dto.UserId = budget.UserId;
+            dto.UserName = user?.Name ?? "Usuário removido";
             dto.CategoryName = category?.Name ?? "Categoria removida";
             dto.SpentAmount = spentAmount;
             dto.RemainingAmount = remainingAmount;

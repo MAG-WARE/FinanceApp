@@ -16,6 +16,8 @@ public class CategorySpendingDto
 {
     public Guid CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal Percentage { get; set; }
     public string? Color { get; set; }

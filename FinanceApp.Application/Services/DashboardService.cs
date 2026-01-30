@@ -11,6 +11,7 @@ public class DashboardService : IDashboardService
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Category> _categoryRepository;
+    private readonly IRepository<User> _userRepository;
     private readonly IUserGroupService _userGroupService;
     private readonly ILogger<DashboardService> _logger;
 
@@ -18,12 +19,14 @@ public class DashboardService : IDashboardService
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
         IRepository<Category> categoryRepository,
+        IRepository<User> userRepository,
         IUserGroupService userGroupService,
         ILogger<DashboardService> logger)
     {
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _categoryRepository = categoryRepository;
+        _userRepository = userRepository;
         _userGroupService = userGroupService;
         _logger = logger;
     }
@@ -109,10 +112,13 @@ public class DashboardService : IDashboardService
             var category = await _categoryRepository.GetByIdAsync(item.CategoryId);
             if (category != null)
             {
+                var user = await _userRepository.GetByIdAsync(category.UserId);
                 topSpendingCategories.Add(new CategorySpendingDto
                 {
                     CategoryId = item.CategoryId,
                     CategoryName = category.Name,
+                    UserId = category.UserId,
+                    UserName = user?.Name ?? "Usuário removido",
                     Amount = item.Amount,
                     Percentage = totalExpenses > 0 ? (item.Amount / totalExpenses) * 100 : 0,
                     Color = category.Color

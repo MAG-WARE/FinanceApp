@@ -12,6 +12,7 @@ public class TransactionService : ITransactionService
     private readonly IRepository<Transaction> _transactionRepository;
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Category> _categoryRepository;
+    private readonly IRepository<User> _userRepository;
     private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<TransactionService> _logger;
@@ -20,6 +21,7 @@ public class TransactionService : ITransactionService
         IRepository<Transaction> transactionRepository,
         IRepository<Account> accountRepository,
         IRepository<Category> categoryRepository,
+        IRepository<User> userRepository,
         IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<TransactionService> logger)
@@ -27,6 +29,7 @@ public class TransactionService : ITransactionService
         _transactionRepository = transactionRepository;
         _accountRepository = accountRepository;
         _categoryRepository = categoryRepository;
+        _userRepository = userRepository;
         _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
@@ -410,8 +413,17 @@ public class TransactionService : ITransactionService
                 destinationAccount = await _accountRepository.GetByIdAsync(transaction.DestinationAccountId.Value);
             }
 
+            // Buscar dados do usuário dono da conta
+            User? user = null;
+            if (account != null)
+            {
+                user = await _userRepository.GetByIdAsync(account.UserId);
+            }
+
             var dto = _mapper.Map<TransactionDto>(transaction);
             dto.AccountName = account?.Name ?? "Conta removida";
+            dto.UserId = account?.UserId ?? Guid.Empty;
+            dto.UserName = user?.Name ?? "Usuário removido";
             dto.CategoryName = category?.Name ?? "Categoria removida";
             dto.DestinationAccountName = destinationAccount?.Name;
 

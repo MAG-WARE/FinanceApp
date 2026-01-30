@@ -3,6 +3,8 @@ namespace FinanceApp.Application.DTOs;
 public class BudgetDto
 {
     public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
     public Guid CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public int Month { get; set; }
@@ -30,6 +32,8 @@ public class UpdateBudgetDto
 public class BudgetStatusDto
 {
     public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
     public string CategoryName { get; set; } = string.Empty;
     public int Month { get; set; }
     public int Year { get; set; }

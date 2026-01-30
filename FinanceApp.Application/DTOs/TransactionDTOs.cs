@@ -7,6 +7,8 @@ public class TransactionDto
     public Guid Id { get; set; }
     public Guid AccountId { get; set; }
     public string AccountName { get; set; } = string.Empty;
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
     public Guid CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public decimal Amount { get; set; }
