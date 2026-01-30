@@ -3,48 +3,38 @@ using FinanceApp.Application.DTOs;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Domain.Entities;
 using FinanceApp.Domain.Enums;
-using FinanceApp.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceApp.Application.Services;
 
 public class UserGroupService : IUserGroupService
 {
-    private readonly FinanceAppDbContext _context;
+    private readonly IUserGroupRepository _userGroupRepository;
+    private readonly IGoalRepository _goalRepository;
     private readonly IMapper _mapper;
     private readonly ILogger<UserGroupService> _logger;
 
     public UserGroupService(
-        FinanceAppDbContext context,
+        IUserGroupRepository userGroupRepository,
+        IGoalRepository goalRepository,
         IMapper mapper,
         ILogger<UserGroupService> logger)
     {
-        _context = context;
+        _userGroupRepository = userGroupRepository;
+        _goalRepository = goalRepository;
         _mapper = mapper;
         _logger = logger;
     }
 
     public async Task<IEnumerable<UserGroupDto>> GetUserGroupsAsync(Guid userId)
     {
-        var groups = await _context.UserGroups
-            .Include(g => g.CreatedByUser)
-            .Include(g => g.Members)
-                .ThenInclude(m => m.User)
-            .Where(g => g.Members.Any(m => m.UserId == userId))
-            .ToListAsync();
-
+        var groups = await _userGroupRepository.GetUserGroupsWithMembersAsync(userId);
         return _mapper.Map<IEnumerable<UserGroupDto>>(groups);
     }
 
     public async Task<UserGroupDto?> GetGroupByIdAsync(Guid groupId, Guid userId)
     {
-        var group = await _context.UserGroups
-            .Include(g => g.CreatedByUser)
-            .Include(g => g.Members)
-                .ThenInclude(m => m.User)
-            .FirstOrDefaultAsync(g => g.Id == groupId && g.Members.Any(m => m.UserId == userId));
-
+        var group = await _userGroupRepository.GetGroupByIdWithMembersAsync(groupId, userId);
         return group == null ? null : _mapper.Map<UserGroupDto>(group);
     }
 
@@ -57,7 +47,7 @@ public class UserGroupService : IUserGroupService
         group.CreatedByUserId = userId;
         group.InviteCode = GenerateInviteCode();
 
-        _context.UserGroups.Add(group);
+        await _userGroupRepository.AddAsync(group);
 
         // Add creator as owner member
         var member = new UserGroupMember
@@ -69,17 +59,14 @@ public class UserGroupService : IUserGroupService
             JoinedAt = DateTime.UtcNow
         };
 
-        _context.UserGroupMembers.Add(member);
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.AddMemberAsync(member);
 
         return await GetGroupByIdAsync(group.Id, userId) ?? throw new Exception("Erro ao criar grupo");
     }
 
     public async Task<UserGroupDto> UpdateGroupAsync(Guid groupId, UpdateUserGroupDto dto, Guid userId)
     {
-        var group = await _context.UserGroups
-            .Include(g => g.Members)
-            .FirstOrDefaultAsync(g => g.Id == groupId);
+        var group = await _userGroupRepository.GetGroupByIdAsync(groupId);
 
         if (group == null)
             throw new KeyNotFoundException("Grupo não encontrado");
@@ -93,16 +80,14 @@ public class UserGroupService : IUserGroupService
         group.Name = dto.Name;
         group.Description = dto.Description;
 
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.UpdateAsync(group);
 
         return await GetGroupByIdAsync(group.Id, userId) ?? throw new Exception("Erro ao atualizar grupo");
     }
 
     public async Task DeleteGroupAsync(Guid groupId, Guid userId)
     {
-        var group = await _context.UserGroups
-            .Include(g => g.Members)
-            .FirstOrDefaultAsync(g => g.Id == groupId);
+        var group = await _userGroupRepository.GetGroupByIdAsync(groupId);
 
         if (group == null)
             throw new KeyNotFoundException("Grupo não encontrado");
@@ -114,14 +99,12 @@ public class UserGroupService : IUserGroupService
         _logger.LogInformation("Deleting group {GroupId} for user {UserId}", groupId, userId);
 
         group.IsDeleted = true;
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.UpdateAsync(group);
     }
 
     public async Task<UserGroupDto> JoinGroupAsync(JoinGroupDto dto, Guid userId)
     {
-        var group = await _context.UserGroups
-            .Include(g => g.Members)
-            .FirstOrDefaultAsync(g => g.InviteCode == dto.InviteCode && !g.IsDeleted);
+        var group = await _userGroupRepository.GetGroupByInviteCodeAsync(dto.InviteCode);
 
         if (group == null)
             throw new KeyNotFoundException("Código de convite inválido ou grupo não encontrado");
@@ -140,16 +123,14 @@ public class UserGroupService : IUserGroupService
             JoinedAt = DateTime.UtcNow
         };
 
-        _context.UserGroupMembers.Add(member);
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.AddMemberAsync(member);
 
         return await GetGroupByIdAsync(group.Id, userId) ?? throw new Exception("Erro ao entrar no grupo");
     }
 
     public async Task LeaveGroupAsync(Guid groupId, Guid userId)
     {
-        var membership = await _context.UserGroupMembers
-            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId && !m.IsDeleted);
+        var membership = await _userGroupRepository.GetMembershipAsync(groupId, userId);
 
         if (membership == null)
             throw new KeyNotFoundException("Você não é membro deste grupo");
@@ -160,19 +141,17 @@ public class UserGroupService : IUserGroupService
         _logger.LogInformation("User {UserId} leaving group {GroupId}", userId, groupId);
 
         membership.IsDeleted = true;
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.UpdateMemberAsync(membership);
     }
 
     public async Task RemoveMemberAsync(Guid groupId, Guid memberUserId, Guid requestingUserId)
     {
-        var requestingMembership = await _context.UserGroupMembers
-            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == requestingUserId && !m.IsDeleted);
+        var requestingMembership = await _userGroupRepository.GetMembershipAsync(groupId, requestingUserId);
 
         if (requestingMembership == null || requestingMembership.Role != GroupRole.Owner)
             throw new UnauthorizedAccessException("Apenas o proprietário pode remover membros");
 
-        var memberToRemove = await _context.UserGroupMembers
-            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == memberUserId && !m.IsDeleted);
+        var memberToRemove = await _userGroupRepository.GetMembershipAsync(groupId, memberUserId);
 
         if (memberToRemove == null)
             throw new KeyNotFoundException("Membro não encontrado");
@@ -183,14 +162,12 @@ public class UserGroupService : IUserGroupService
         _logger.LogInformation("Removing member {MemberUserId} from group {GroupId}", memberUserId, groupId);
 
         memberToRemove.IsDeleted = true;
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.UpdateMemberAsync(memberToRemove);
     }
 
     public async Task<string> RegenerateInviteCodeAsync(Guid groupId, Guid userId)
     {
-        var group = await _context.UserGroups
-            .Include(g => g.Members)
-            .FirstOrDefaultAsync(g => g.Id == groupId);
+        var group = await _userGroupRepository.GetGroupByIdAsync(groupId);
 
         if (group == null)
             throw new KeyNotFoundException("Grupo não encontrado");
@@ -202,24 +179,19 @@ public class UserGroupService : IUserGroupService
         _logger.LogInformation("Regenerating invite code for group {GroupId}", groupId);
 
         group.InviteCode = GenerateInviteCode();
-        await _context.SaveChangesAsync();
+        await _userGroupRepository.UpdateAsync(group);
 
         return group.InviteCode;
     }
 
     public async Task<IEnumerable<GroupMemberDto>> GetGroupMembersAsync(Guid groupId, Guid userId)
     {
-        var isMember = await _context.UserGroupMembers
-            .AnyAsync(m => m.GroupId == groupId && m.UserId == userId && !m.IsDeleted);
+        var isMember = await _userGroupRepository.IsMemberAsync(groupId, userId);
 
         if (!isMember)
             throw new UnauthorizedAccessException("Você não é membro deste grupo");
 
-        var members = await _context.UserGroupMembers
-            .Include(m => m.User)
-            .Where(m => m.GroupId == groupId && !m.IsDeleted)
-            .ToListAsync();
-
+        var members = await _userGroupRepository.GetGroupMembersAsync(groupId);
         return _mapper.Map<IEnumerable<GroupMemberDto>>(members);
     }
 
@@ -235,15 +207,7 @@ public class UserGroupService : IUserGroupService
                     throw new ArgumentException("MemberUserId é obrigatório para o contexto Member");
 
                 // Verify the user has access to view this member's data
-                var hasAccess = await _context.UserGroupMembers
-                    .Where(m => m.UserId == userId && !m.IsDeleted)
-                    .Select(m => m.GroupId)
-                    .Intersect(
-                        _context.UserGroupMembers
-                            .Where(m => m.UserId == memberUserId.Value && !m.IsDeleted)
-                            .Select(m => m.GroupId)
-                    )
-                    .AnyAsync();
+                var hasAccess = await _userGroupRepository.AreUsersInSameGroupAsync(userId, memberUserId.Value);
 
                 if (!hasAccess)
                     throw new UnauthorizedAccessException("Você não tem acesso aos dados deste usuário");
@@ -252,19 +216,12 @@ public class UserGroupService : IUserGroupService
 
             case ViewContext.All:
                 // Get all user IDs from groups the user belongs to
-                var groupIds = await _context.UserGroupMembers
-                    .Where(m => m.UserId == userId && !m.IsDeleted)
-                    .Select(m => m.GroupId)
-                    .ToListAsync();
+                var groupIds = await _userGroupRepository.GetUserGroupIdsAsync(userId);
 
                 if (!groupIds.Any())
                     return new[] { userId };
 
-                var userIds = await _context.UserGroupMembers
-                    .Where(m => groupIds.Contains(m.GroupId) && !m.IsDeleted)
-                    .Select(m => m.UserId)
-                    .Distinct()
-                    .ToListAsync();
+                var userIds = await _userGroupRepository.GetGroupMemberUserIdsAsync(groupIds);
 
                 return userIds;
 
@@ -275,26 +232,21 @@ public class UserGroupService : IUserGroupService
 
     public async Task ShareGoalAsync(ShareGoalDto dto, Guid userId)
     {
-        var goal = await _context.Goals
-            .Include(g => g.GoalUsers)
-            .FirstOrDefaultAsync(g => g.Id == dto.GoalId && g.UserId == userId && !g.IsDeleted);
+        var goal = await _goalRepository.GetGoalByIdWithUsersAsync(dto.GoalId);
 
-        if (goal == null)
+        if (goal == null || goal.UserId != userId)
             throw new KeyNotFoundException("Meta não encontrada ou você não é o proprietário");
 
         // Verify all users are in the same group as the owner
-        var ownerGroupIds = await _context.UserGroupMembers
-            .Where(m => m.UserId == userId && !m.IsDeleted)
-            .Select(m => m.GroupId)
-            .ToListAsync();
+        var ownerGroupIds = await _userGroupRepository.GetUserGroupIdsAsync(userId);
 
         foreach (var targetUserId in dto.UserIds)
         {
             if (targetUserId == userId)
                 continue;
 
-            var isInSameGroup = await _context.UserGroupMembers
-                .AnyAsync(m => ownerGroupIds.Contains(m.GroupId) && m.UserId == targetUserId && !m.IsDeleted);
+            var targetGroupIds = await _userGroupRepository.GetUserGroupIdsAsync(targetUserId);
+            var isInSameGroup = ownerGroupIds.Intersect(targetGroupIds).Any();
 
             if (!isInSameGroup)
                 throw new InvalidOperationException($"Usuário não está no mesmo grupo");
@@ -309,7 +261,7 @@ public class UserGroupService : IUserGroupService
                     IsOwner = false,
                     AddedAt = DateTime.UtcNow
                 };
-                _context.GoalUsers.Add(goalUser);
+                await _goalRepository.AddGoalUserAsync(goalUser);
             }
         }
 
@@ -323,20 +275,17 @@ public class UserGroupService : IUserGroupService
                 IsOwner = true,
                 AddedAt = DateTime.UtcNow
             };
-            _context.GoalUsers.Add(ownerGoalUser);
+            await _goalRepository.AddGoalUserAsync(ownerGoalUser);
         }
 
         _logger.LogInformation("Sharing goal {GoalId} with users {UserIds}", dto.GoalId, string.Join(", ", dto.UserIds));
-        await _context.SaveChangesAsync();
     }
 
     public async Task UnshareGoalAsync(UnshareGoalDto dto, Guid userId)
     {
-        var goal = await _context.Goals
-            .Include(g => g.GoalUsers)
-            .FirstOrDefaultAsync(g => g.Id == dto.GoalId && g.UserId == userId && !g.IsDeleted);
+        var goal = await _goalRepository.GetGoalByIdWithUsersAsync(dto.GoalId);
 
-        if (goal == null)
+        if (goal == null || goal.UserId != userId)
             throw new KeyNotFoundException("Meta não encontrada ou você não é o proprietário");
 
         if (dto.UserId == userId)
@@ -345,18 +294,14 @@ public class UserGroupService : IUserGroupService
         var goalUser = goal.GoalUsers.FirstOrDefault(gu => gu.UserId == dto.UserId);
         if (goalUser != null)
         {
-            _context.GoalUsers.Remove(goalUser);
+            await _goalRepository.RemoveGoalUserAsync(goalUser);
             _logger.LogInformation("Unsharing goal {GoalId} with user {TargetUserId}", dto.GoalId, dto.UserId);
-            await _context.SaveChangesAsync();
         }
     }
 
     public async Task<IEnumerable<GoalUserDto>> GetGoalUsersAsync(Guid goalId, Guid userId)
     {
-        var goal = await _context.Goals
-            .Include(g => g.GoalUsers)
-                .ThenInclude(gu => gu.User)
-            .FirstOrDefaultAsync(g => g.Id == goalId && !g.IsDeleted);
+        var goal = await _goalRepository.GetGoalByIdWithUsersAsync(goalId);
 
         if (goal == null)
             throw new KeyNotFoundException("Meta não encontrada");
@@ -366,7 +311,8 @@ public class UserGroupService : IUserGroupService
         if (!hasAccess)
             throw new UnauthorizedAccessException("Você não tem acesso a esta meta");
 
-        return _mapper.Map<IEnumerable<GoalUserDto>>(goal.GoalUsers);
+        var goalUsers = await _goalRepository.GetGoalUsersAsync(goalId);
+        return _mapper.Map<IEnumerable<GoalUserDto>>(goalUsers);
     }
 
     private static string GenerateInviteCode()

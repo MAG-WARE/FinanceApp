@@ -104,6 +104,8 @@ var mapper = mapperConfig.CreateMapper();
 builder.Services.AddSingleton<AutoMapper.IMapper>(mapper);
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUserGroupRepository, UserGroupRepository>();
+builder.Services.AddScoped<IGoalRepository, GoalRepository>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();
