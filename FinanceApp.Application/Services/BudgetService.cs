@@ -55,7 +55,7 @@ public class BudgetService : IBudgetService
         if (budget == null)
             return null;
 
-        var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, userId);
+        var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, new[] { userId });
         return budgetDtos.FirstOrDefault();
     }
 
@@ -111,7 +111,7 @@ public class BudgetService : IBudgetService
                 _logger.LogInformation("Orçamento criado com sucesso - BudgetId: {BudgetId}, UserId: {UserId}",
                     createdBudget.Id, userId);
 
-                var budgetDtos = await MapBudgetsWithSpending(new[] { createdBudget }, userId);
+                var budgetDtos = await MapBudgetsWithSpending(new[] { createdBudget }, new[] { userId });
                 return budgetDtos.First();
             }
             catch (Exception ex)
@@ -162,7 +162,7 @@ public class BudgetService : IBudgetService
                 _logger.LogInformation("Orçamento atualizado com sucesso - BudgetId: {BudgetId}, UserId: {UserId}",
                     budgetId, userId);
 
-                var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, userId);
+                var budgetDtos = await MapBudgetsWithSpending(new[] { budget }, new[] { userId });
                 return budgetDtos.First();
             }
             catch (Exception ex)
