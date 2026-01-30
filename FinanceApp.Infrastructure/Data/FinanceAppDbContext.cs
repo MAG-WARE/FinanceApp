@@ -178,6 +178,9 @@ public class FinanceAppDbContext : DbContext
                 .WithMany(u => u.SharedGoals)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Filtrar GoalUsers quando o Goal relacionado for soft deleted
+            entity.HasQueryFilter(e => !e.Goal.IsDeleted);
         });
     }
 
