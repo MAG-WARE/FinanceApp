@@ -13,7 +13,9 @@ public enum TransactionType
 {
     Income = 1,
     Expense = 2,
-    Transfer = 3
+    Transfer = 3,
+    GoalDeposit = 4,
+    GoalWithdraw = 5
 }
 
 public enum CategoryType

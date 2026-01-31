@@ -79,6 +79,17 @@ public class GoalController : ControllerBase
     }
 
     /// <summary>
+    /// Lista metas disponíveis para transação (próprias e compartilhadas)
+    /// </summary>
+    [HttpGet("for-transaction")]
+    public async Task<ActionResult<IEnumerable<GoalForTransactionDto>>> GetForTransaction()
+    {
+        var userId = GetUserId();
+        var goals = await _goalService.GetGoalsForTransactionAsync(userId);
+        return Ok(goals);
+    }
+
+    /// <summary>
     /// Obtém uma meta específica por ID
     /// </summary>
     [HttpGet("{id}")]

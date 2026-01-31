@@ -82,7 +82,13 @@ public class FinanceAppDbContext : DbContext
                 .HasForeignKey(e => e.DestinationAccountId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired(false);
-            
+
+            entity.HasOne(e => e.Goal)
+                .WithMany()
+                .HasForeignKey(e => e.GoalId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
+
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 

@@ -31,6 +31,10 @@ public class CreateTransactionDtoValidator : AbstractValidator<CreateTransaction
         RuleFor(x => x.DestinationAccountId)
             .NotEmpty().WithMessage("Conta de destino é obrigatória para transferências")
             .When(x => x.Type == TransactionType.Transfer);
+
+        RuleFor(x => x.GoalId)
+            .NotEmpty().WithMessage("Meta é obrigatória para transações de depósito/retirada de meta")
+            .When(x => x.Type == TransactionType.GoalDeposit || x.Type == TransactionType.GoalWithdraw);
     }
 }
 

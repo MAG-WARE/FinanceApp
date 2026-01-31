@@ -281,9 +281,11 @@ public class AccountService : IAccountService
         {
             if (transaction.AccountId == accountId)
             {
-                if (transaction.Type == TransactionType.Income)
+                if (transaction.Type == TransactionType.Income || transaction.Type == TransactionType.GoalWithdraw)
                     balance += transaction.Amount;
-                else if (transaction.Type == TransactionType.Expense || transaction.Type == TransactionType.Transfer)
+                else if (transaction.Type == TransactionType.Expense ||
+                         transaction.Type == TransactionType.Transfer ||
+                         transaction.Type == TransactionType.GoalDeposit)
                     balance -= transaction.Amount;
             }
 

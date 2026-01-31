@@ -13,6 +13,7 @@ public class TransactionService : ITransactionService
     private readonly IRepository<Account> _accountRepository;
     private readonly IRepository<Category> _categoryRepository;
     private readonly IRepository<User> _userRepository;
+    private readonly IGoalRepository _goalRepository;
     private readonly IUserGroupService _userGroupService;
     private readonly IMapper _mapper;
     private readonly ILogger<TransactionService> _logger;
@@ -22,6 +23,7 @@ public class TransactionService : ITransactionService
         IRepository<Account> accountRepository,
         IRepository<Category> categoryRepository,
         IRepository<User> userRepository,
+        IGoalRepository goalRepository,
         IUserGroupService userGroupService,
         IMapper mapper,
         ILogger<TransactionService> logger)
@@ -30,6 +32,7 @@ public class TransactionService : ITransactionService
         _accountRepository = accountRepository;
         _categoryRepository = categoryRepository;
         _userRepository = userRepository;
+        _goalRepository = goalRepository;
         _userGroupService = userGroupService;
         _mapper = mapper;
         _logger = logger;
@@ -141,6 +144,43 @@ public class TransactionService : ITransactionService
                 }
             }
 
+            Goal? goal = null;
+            if (dto.Type == TransactionType.GoalDeposit || dto.Type == TransactionType.GoalWithdraw)
+            {
+                if (!dto.GoalId.HasValue)
+                {
+                    _logger.LogWarning("Tentativa de criar transação de meta sem especificar a meta");
+                    throw new InvalidOperationException("Meta é obrigatória para transações de depósito/retirada de meta");
+                }
+
+                goal = await _goalRepository.GetGoalByIdWithUsersAsync(dto.GoalId.Value);
+                if (goal == null)
+                {
+                    _logger.LogWarning("Meta não encontrada: {GoalId}", dto.GoalId.Value);
+                    throw new KeyNotFoundException($"Meta com ID {dto.GoalId.Value} não encontrada");
+                }
+
+                var isGoalOwner = goal.UserId == userId;
+                var isGoalShared = await _goalRepository.IsGoalSharedWithUserAsync(dto.GoalId.Value, userId);
+
+                if (!isGoalOwner && !isGoalShared)
+                {
+                    _logger.LogWarning("Usuário não tem acesso à meta - UserId: {UserId}, GoalId: {GoalId}",
+                        userId, dto.GoalId.Value);
+                    throw new UnauthorizedAccessException("Usuário não tem acesso a esta meta");
+                }
+
+                if (dto.Type == TransactionType.GoalWithdraw)
+                {
+                    if (goal.CurrentAmount < dto.Amount)
+                    {
+                        _logger.LogWarning("Saldo insuficiente na meta - GoalId: {GoalId}, CurrentAmount: {CurrentAmount}, RequestedAmount: {RequestedAmount}",
+                            dto.GoalId.Value, goal.CurrentAmount, dto.Amount);
+                        throw new InvalidOperationException($"Saldo insuficiente na meta. Saldo atual: {goal.CurrentAmount:C}");
+                    }
+                }
+            }
+
             _logger.LogInformation("Validações concluídas. Criando entidade de transação...");
 
             var transaction = _mapper.Map<Transaction>(dto);
@@ -154,6 +194,32 @@ public class TransactionService : ITransactionService
             try
             {
                 var createdTransaction = await _transactionRepository.AddAsync(transaction);
+
+                if (goal != null)
+                {
+                    if (dto.Type == TransactionType.GoalDeposit)
+                    {
+                        goal.CurrentAmount += dto.Amount;
+                        if (goal.CurrentAmount >= goal.TargetAmount)
+                        {
+                            goal.IsCompleted = true;
+                            _logger.LogInformation("Meta concluída! - GoalId: {GoalId}, CurrentAmount: {CurrentAmount}, TargetAmount: {TargetAmount}",
+                                goal.Id, goal.CurrentAmount, goal.TargetAmount);
+                        }
+                    }
+                    else if (dto.Type == TransactionType.GoalWithdraw)
+                    {
+                        goal.CurrentAmount -= dto.Amount;
+                        if (goal.IsCompleted && goal.CurrentAmount < goal.TargetAmount)
+                        {
+                            goal.IsCompleted = false;
+                        }
+                    }
+
+                    await _goalRepository.UpdateAsync(goal);
+                    _logger.LogInformation("Meta atualizada - GoalId: {GoalId}, NewCurrentAmount: {CurrentAmount}",
+                        goal.Id, goal.CurrentAmount);
+                }
 
                 _logger.LogInformation("Transação criada com sucesso - TransactionId: {TransactionId}, UserId: {UserId}",
                     createdTransaction.Id, userId);
@@ -406,6 +472,12 @@ public class TransactionService : ITransactionService
                 destinationAccount = await _accountRepository.GetByIdAsync(transaction.DestinationAccountId.Value);
             }
 
+            Goal? goal = null;
+            if (transaction.GoalId.HasValue)
+            {
+                goal = await _goalRepository.GetGoalByIdAsync(transaction.GoalId.Value);
+            }
+
             User? user = null;
             if (account != null)
             {
@@ -418,6 +490,7 @@ public class TransactionService : ITransactionService
             dto.UserName = user?.Name ?? "Usuário removido";
             dto.CategoryName = category?.Name ?? "Categoria removida";
             dto.DestinationAccountName = destinationAccount?.Name;
+            dto.GoalName = goal?.Name;
 
             transactionDtos.Add(dto);
         }
