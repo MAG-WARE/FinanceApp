@@ -95,7 +95,6 @@ public class GoalRepository : IGoalRepository
         _context.GoalUsers.Add(goalUser);
         await _context.SaveChangesAsync();
 
-        // Reload with includes
         var createdGoal = await _context.Goals
             .Include(g => g.User)
             .Include(g => g.GoalUsers)

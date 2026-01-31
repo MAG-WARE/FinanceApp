@@ -9,7 +9,6 @@ public class UserGroupMember : BaseEntity
     public GroupRole Role { get; set; }
     public DateTime JoinedAt { get; set; }
 
-    // Navigation properties
     public UserGroup Group { get; set; } = null!;
     public User User { get; set; } = null!;
 }

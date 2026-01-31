@@ -12,7 +12,6 @@ public class Account : BaseEntity
     public string? Color { get; set; }
     public string? Icon { get; set; }
     
-    // Navigation properties
     public User User { get; set; } = null!;
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }

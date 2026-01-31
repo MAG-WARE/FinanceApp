@@ -7,7 +7,6 @@ public class UserGroup : BaseEntity
     public Guid CreatedByUserId { get; set; }
     public string InviteCode { get; set; } = string.Empty;
 
-    // Navigation properties
     public User CreatedByUser { get; set; } = null!;
     public ICollection<UserGroupMember> Members { get; set; } = new List<UserGroupMember>();
 }

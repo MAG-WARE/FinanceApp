@@ -23,7 +23,6 @@ public class FinanceAppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // User configurations
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -35,7 +34,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // Account configurations
         modelBuilder.Entity<Account>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -50,7 +48,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // Category configurations
         modelBuilder.Entity<Category>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -64,7 +61,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // Transaction configurations
         modelBuilder.Entity<Transaction>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -90,7 +86,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // Budget configurations
         modelBuilder.Entity<Budget>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -111,7 +106,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // Goal configurations
         modelBuilder.Entity<Goal>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -128,7 +122,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // UserGroup configurations
         modelBuilder.Entity<UserGroup>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -145,7 +138,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // UserGroupMember configurations
         modelBuilder.Entity<UserGroupMember>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -164,7 +156,6 @@ public class FinanceAppDbContext : DbContext
             entity.HasQueryFilter(e => !e.IsDeleted);
         });
 
-        // GoalUser configurations (N:N relationship for shared goals)
         modelBuilder.Entity<GoalUser>(entity =>
         {
             entity.HasKey(e => new { e.GoalId, e.UserId });
@@ -179,7 +170,6 @@ public class FinanceAppDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Filtrar GoalUsers quando o Goal relacionado for soft deleted
             entity.HasQueryFilter(e => !e.Goal.IsDeleted);
         });
     }
@@ -200,7 +190,6 @@ public class FinanceAppDbContext : DbContext
             }
         }
 
-        // Converter todos os DateTime para UTC (corrigir problema com PostgreSQL)
         var allEntries = ChangeTracker.Entries()
             .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
 

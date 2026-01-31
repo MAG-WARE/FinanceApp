@@ -8,7 +8,6 @@ public class Budget : BaseEntity
     public int Year { get; set; }
     public decimal LimitAmount { get; set; }
     
-    // Navigation properties
     public User User { get; set; } = null!;
     public Category Category { get; set; } = null!;
 }

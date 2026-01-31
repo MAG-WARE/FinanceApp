@@ -45,7 +45,6 @@ public class GoalService : IGoalService
         if (goal == null)
             return null;
 
-        // Check access: user is owner or goal is shared with user
         var hasAccess = goal.UserId == userId || goal.GoalUsers.Any(gu => gu.UserId == userId);
         if (!hasAccess)
             return null;
@@ -71,7 +70,6 @@ public class GoalService : IGoalService
         if (goal.CurrentAmount >= goal.TargetAmount)
             goal.IsCompleted = true;
 
-        // Add owner to GoalUsers table
         var goalUser = new GoalUser
         {
             GoalId = goal.Id,
@@ -92,7 +90,6 @@ public class GoalService : IGoalService
         if (goal == null)
             throw new KeyNotFoundException("Meta nao encontrada");
 
-        // Only owner can update
         if (goal.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o proprietario pode editar a meta");
 
@@ -129,7 +126,6 @@ public class GoalService : IGoalService
         if (goal == null)
             throw new KeyNotFoundException("Meta nao encontrada");
 
-        // Only owner can delete
         if (goal.UserId != userId)
             throw new UnauthorizedAccessException("Apenas o proprietario pode excluir a meta");
 

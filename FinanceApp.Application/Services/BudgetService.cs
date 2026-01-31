@@ -70,7 +70,6 @@ public class BudgetService : IBudgetService
                 "Iniciando criação de orçamento - UserId: {UserId}, CategoryId: {CategoryId}, Month: {Month}/{Year}, Limit: {Limit}",
                 userId, dto.CategoryId, dto.Month, dto.Year, dto.LimitAmount);
 
-            // Validar que a categoria pertence ao usuário
             var category = await _categoryRepository.GetByIdAsync(dto.CategoryId);
             if (category == null)
             {
@@ -85,7 +84,6 @@ public class BudgetService : IBudgetService
                 throw new UnauthorizedAccessException("Categoria não pertence ao usuário");
             }
 
-            // Verificar se já existe um orçamento para essa categoria e período
             var existingBudgets = await _budgetRepository.FindAsync(b =>
                 b.UserId == userId &&
                 b.CategoryId == dto.CategoryId &&
@@ -105,7 +103,7 @@ public class BudgetService : IBudgetService
             var budget = _mapper.Map<Budget>(dto);
             budget.UserId = userId;
             budget.Id = Guid.NewGuid();
-            budget.CreatedAt = DateTime.UtcNow; // Garantir que CreatedAt está em UTC
+            budget.CreatedAt = DateTime.UtcNow; 
 
             try
             {

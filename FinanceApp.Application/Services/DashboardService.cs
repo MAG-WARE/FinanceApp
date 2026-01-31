@@ -64,7 +64,6 @@ public class DashboardService : IDashboardService
     {
         var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
 
-        // Garantir que as datas estão em UTC para PostgreSQL
         var startDateUtc = startDate.Kind == DateTimeKind.Utc
             ? startDate
             : DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
@@ -93,7 +92,6 @@ public class DashboardService : IDashboardService
 
         var balance = totalIncome - totalExpenses;
 
-        // Top 5 categorias de gastos
         var expensesByCategory = transactions
             .Where(t => t.Type == TransactionType.Expense)
             .GroupBy(t => t.CategoryId)
@@ -126,10 +124,8 @@ public class DashboardService : IDashboardService
             }
         }
 
-        // Evolução do saldo nos últimos 6 meses
         var balanceHistory = await GetBalanceHistoryAsync(accessibleUserIds, 6);
 
-        // Comparativo com mês anterior
         var comparison = await GetComparisonWithPreviousMonthAsync(accessibleUserIds, startDateUtc);
 
         return new DashboardSummaryDto
@@ -190,12 +186,10 @@ public class DashboardService : IDashboardService
         var userAccounts = await _accountRepository.FindAsync(a => userIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
-        // Garantir que a data está em UTC
         var currentMonthStartUtc = currentMonthStart.Kind == DateTimeKind.Utc
             ? currentMonthStart
             : DateTime.SpecifyKind(currentMonthStart, DateTimeKind.Utc);
 
-        // Mês atual
         var currentMonthEnd = DateTime.SpecifyKind(currentMonthStartUtc.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
         var currentTransactions = await _transactionRepository.FindAsync(t =>
             accountIds.Contains(t.AccountId) &&
@@ -210,7 +204,6 @@ public class DashboardService : IDashboardService
             .Where(t => t.Type == TransactionType.Expense)
             .Sum(t => t.Amount);
 
-        // Mês anterior
         var previousMonthStart = DateTime.SpecifyKind(currentMonthStartUtc.AddMonths(-1), DateTimeKind.Utc);
         var previousMonthEnd = DateTime.SpecifyKind(previousMonthStart.AddMonths(1).AddDays(-1), DateTimeKind.Utc);
         var previousTransactions = await _transactionRepository.FindAsync(t =>

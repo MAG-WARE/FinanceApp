@@ -167,7 +167,6 @@ public class AccountService : IAccountService
                 throw new KeyNotFoundException($"Conta com ID {accountId} não encontrada");
             }
 
-            // Verificar se há transações associadas
             var transactions = await _transactionRepository.FindAsync(t =>
                 t.AccountId == accountId || t.DestinationAccountId == accountId);
 

@@ -41,18 +41,13 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
 
     public async Task UpdateAsync(T entity)
     {
-        // Verificar se a entidade já está sendo rastreada
         var existingEntry = _context.ChangeTracker.Entries<T>()
             .FirstOrDefault(e => e.Entity.Id == entity.Id);
 
         if (existingEntry != null)
-        {
-            // Se já está sendo rastreada, atualizar os valores
             existingEntry.CurrentValues.SetValues(entity);
-        }
         else
         {
-            // Se não está sendo rastreada, anexar e marcar como modificada
             _context.Attach(entity);
             _context.Entry(entity).State = EntityState.Modified;
         }

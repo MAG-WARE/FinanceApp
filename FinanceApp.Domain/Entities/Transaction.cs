@@ -13,10 +13,8 @@ public class Transaction : BaseEntity
     public bool IsRecurring { get; set; }
     public string? Notes { get; set; }
     
-    // Para transferências entre contas
     public Guid? DestinationAccountId { get; set; }
     
-    // Navigation properties
     public Account Account { get; set; } = null!;
     public Category Category { get; set; } = null!;
     public Account? DestinationAccount { get; set; }

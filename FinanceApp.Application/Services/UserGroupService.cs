@@ -49,7 +49,6 @@ public class UserGroupService : IUserGroupService
 
         await _userGroupRepository.AddAsync(group);
 
-        // Add creator as owner member
         var member = new UserGroupMember
         {
             Id = Guid.NewGuid(),
@@ -206,7 +205,6 @@ public class UserGroupService : IUserGroupService
                 if (!memberUserId.HasValue)
                     throw new ArgumentException("MemberUserId é obrigatório para o contexto Member");
 
-                // Verify the user has access to view this member's data
                 var hasAccess = await _userGroupRepository.AreUsersInSameGroupAsync(userId, memberUserId.Value);
 
                 if (!hasAccess)
@@ -215,7 +213,6 @@ public class UserGroupService : IUserGroupService
                 return new[] { memberUserId.Value };
 
             case ViewContext.All:
-                // Get all user IDs from groups the user belongs to
                 var groupIds = await _userGroupRepository.GetUserGroupIdsAsync(userId);
 
                 if (!groupIds.Any())
@@ -237,7 +234,6 @@ public class UserGroupService : IUserGroupService
         if (goal == null || goal.UserId != userId)
             throw new KeyNotFoundException("Meta não encontrada ou você não é o proprietário");
 
-        // Verify all users are in the same group as the owner
         var ownerGroupIds = await _userGroupRepository.GetUserGroupIdsAsync(userId);
 
         foreach (var targetUserId in dto.UserIds)
@@ -265,7 +261,6 @@ public class UserGroupService : IUserGroupService
             }
         }
 
-        // Ensure owner is in GoalUsers
         if (!goal.GoalUsers.Any(gu => gu.UserId == userId))
         {
             var ownerGoalUser = new GoalUser
@@ -306,7 +301,6 @@ public class UserGroupService : IUserGroupService
         if (goal == null)
             throw new KeyNotFoundException("Meta não encontrada");
 
-        // User must be owner or shared with
         var hasAccess = goal.UserId == userId || goal.GoalUsers.Any(gu => gu.UserId == userId);
         if (!hasAccess)
             throw new UnauthorizedAccessException("Você não tem acesso a esta meta");

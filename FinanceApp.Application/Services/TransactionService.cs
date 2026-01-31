@@ -44,11 +44,9 @@ public class TransactionService : ITransactionService
     {
         var accessibleUserIds = await _userGroupService.GetAccessibleUserIdsAsync(userId, context, memberUserId);
 
-        // Buscar contas dos usuários acessíveis
         var userAccounts = await _accountRepository.FindAsync(a => accessibleUserIds.Contains(a.UserId));
         var accountIds = userAccounts.Select(a => a.Id).ToList();
 
-        // Buscar transações das contas
         var transactions = await _transactionRepository.FindAsync(t => accountIds.Contains(t.AccountId));
 
         var orderedTransactions = transactions
@@ -65,7 +63,6 @@ public class TransactionService : ITransactionService
         if (transaction == null)
             return null;
 
-        // Verificar se a transação pertence ao usuário
         var account = await _accountRepository.GetByIdAsync(transaction.AccountId);
         if (account == null || account.UserId != userId)
             return null;
@@ -81,7 +78,6 @@ public class TransactionService : ITransactionService
                 "Iniciando criação de transação - UserId: {UserId}, Type: {Type}, Amount: {Amount}, AccountId: {AccountId}, CategoryId: {CategoryId}",
                 userId, dto.Type, dto.Amount, dto.AccountId, dto.CategoryId);
 
-            // Validar que a conta pertence ao usuário
             var account = await _accountRepository.GetByIdAsync(dto.AccountId);
             if (account == null)
             {
@@ -95,7 +91,6 @@ public class TransactionService : ITransactionService
                 throw new UnauthorizedAccessException("Conta não pertence ao usuário");
             }
 
-            // Validar que a categoria pertence ao usuário
             var category = await _categoryRepository.GetByIdAsync(dto.CategoryId);
             if (category == null)
             {
@@ -109,7 +104,6 @@ public class TransactionService : ITransactionService
                 throw new UnauthorizedAccessException("Categoria não pertence ao usuário");
             }
 
-            // Validar tipo de categoria com tipo de transação
             if ((dto.Type == TransactionType.Income && category.Type != CategoryType.Income) ||
                 (dto.Type == TransactionType.Expense && category.Type != CategoryType.Expense))
             {
@@ -119,7 +113,6 @@ public class TransactionService : ITransactionService
                 throw new InvalidOperationException($"Tipo de categoria ({category.Type}) não corresponde ao tipo de transação ({dto.Type})");
             }
 
-            // Validar conta de destino para transferências
             if (dto.Type == TransactionType.Transfer)
             {
                 if (!dto.DestinationAccountId.HasValue)
@@ -413,7 +406,6 @@ public class TransactionService : ITransactionService
                 destinationAccount = await _accountRepository.GetByIdAsync(transaction.DestinationAccountId.Value);
             }
 
-            // Buscar dados do usuário dono da conta
             User? user = null;
             if (account != null)
             {

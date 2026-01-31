@@ -7,7 +7,6 @@ public class GoalUser
     public bool IsOwner { get; set; }
     public DateTime AddedAt { get; set; }
 
-    // Navigation properties
     public Goal Goal { get; set; } = null!;
     public User User { get; set; } = null!;
 }
