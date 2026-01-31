@@ -46,3 +46,14 @@ public class UpdateGoalDto
     public string? Color { get; set; }
     public string? Icon { get; set; }
 }
+
+public class GoalForTransactionDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal CurrentAmount { get; set; }
+    public decimal TargetAmount { get; set; }
+    public bool IsOwner { get; set; }
+    public string? Color { get; set; }
+    public string? Icon { get; set; }
+}

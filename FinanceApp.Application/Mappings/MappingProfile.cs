@@ -29,7 +29,8 @@ public class MappingProfile : Profile
         CreateMap<Transaction, TransactionDto>()
             .ForMember(dest => dest.AccountName, opt => opt.MapFrom(src => src.Account.Name))
             .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.Name))
-            .ForMember(dest => dest.DestinationAccountName, opt => opt.MapFrom(src => src.DestinationAccount != null ? src.DestinationAccount.Name : null));
+            .ForMember(dest => dest.DestinationAccountName, opt => opt.MapFrom(src => src.DestinationAccount != null ? src.DestinationAccount.Name : null))
+            .ForMember(dest => dest.GoalName, opt => opt.MapFrom(src => src.Goal != null ? src.Goal.Name : null));
         CreateMap<CreateTransactionDto, Transaction>();
         CreateMap<UpdateTransactionDto, Transaction>()
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));

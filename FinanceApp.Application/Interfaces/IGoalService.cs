@@ -16,4 +16,5 @@ public interface IGoalService
     Task<IEnumerable<GoalDto>> GetCompletedGoalsAsync(Guid userId);
     Task<IEnumerable<GoalDto>> GetCompletedGoalsAsync(Guid userId, ViewContext context, Guid? memberUserId = null);
     Task<IEnumerable<GoalDto>> GetSharedGoalsAsync(Guid userId);
+    Task<IEnumerable<GoalForTransactionDto>> GetGoalsForTransactionAsync(Guid userId);
 }
