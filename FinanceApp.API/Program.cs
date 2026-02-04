@@ -1,4 +1,5 @@
 using FinanceApp.API.Middleware;
+using FinanceApp.API.ModelBinders;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Application.Mappings;
 using FinanceApp.Application.Services;
@@ -10,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +22,14 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+    {
+        options.ModelBinderProviders.Insert(0, new EnumModelBinderProvider());
+    })
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
