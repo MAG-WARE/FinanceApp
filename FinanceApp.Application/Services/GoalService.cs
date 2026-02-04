@@ -165,6 +165,25 @@ public class GoalService : IGoalService
         return MapGoalsWithProgress(goals, userId);
     }
 
+    public async Task<IEnumerable<GoalForTransactionDto>> GetGoalsForTransactionAsync(Guid userId)
+    {
+        var ownGoals = await _goalRepository.GetGoalsWithUsersAsync(new[] { userId });
+        var sharedGoals = await _goalRepository.GetSharedGoalsAsync(userId);
+
+        var allGoals = ownGoals.Concat(sharedGoals.Where(g => g.UserId != userId)).DistinctBy(g => g.Id);
+
+        return allGoals.Select(goal => new GoalForTransactionDto
+        {
+            Id = goal.Id,
+            Name = goal.Name,
+            CurrentAmount = goal.CurrentAmount,
+            TargetAmount = goal.TargetAmount,
+            IsOwner = goal.UserId == userId,
+            Color = goal.Color,
+            Icon = goal.Icon
+        }).ToList();
+    }
+
     private IEnumerable<GoalDto> MapGoalsWithProgress(IEnumerable<Goal> goals, Guid currentUserId)
     {
         var goalDtos = new List<GoalDto>();
