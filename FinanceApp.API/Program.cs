@@ -1,5 +1,4 @@
 using FinanceApp.API.Middleware;
-using FinanceApp.API.ModelBinders;
 using FinanceApp.Application.Interfaces;
 using FinanceApp.Application.Mappings;
 using FinanceApp.Application.Services;
@@ -22,10 +21,7 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-builder.Services.AddControllers(options =>
-    {
-        options.ModelBinderProviders.Insert(0, new EnumModelBinderProvider());
-    })
+builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
