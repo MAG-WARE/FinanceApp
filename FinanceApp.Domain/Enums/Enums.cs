@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using FinanceApp.Domain.Converters;
+
 namespace FinanceApp.Domain.Enums;
 
 public enum AccountType
@@ -30,6 +33,7 @@ public enum GroupRole
     Member = 2
 }
 
+[TypeConverter(typeof(ViewContextTypeConverter))]
 public enum ViewContext
 {
     Own = 1,
